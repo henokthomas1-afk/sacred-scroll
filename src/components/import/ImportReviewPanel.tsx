@@ -1,6 +1,6 @@
 /**
  * ImportReviewPanel - Review and edit parsed nodes before saving
- * 
+ *
  * Allows users to:
  * - Reclassify nodes (structural, citable, ignored)
  * - Merge or split paragraphs
@@ -8,12 +8,12 @@
  * - Confirm final structure before canonicalization
  */
 
-import { useState } from 'react';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
+import { useState } from "react";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,18 +23,12 @@ import {
   DropdownMenuSub,
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog';
-import { Textarea } from '@/components/ui/textarea';
-import { ReviewNode, ReviewStats } from '@/types/review';
-import { StructuralLevel } from '@/types/document';
-import { cn } from '@/lib/utils';
+} from "@/components/ui/dropdown-menu";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { ReviewNode, ReviewStats } from "@/types/review";
+import { StructuralLevel } from "@/types/document";
+import { cn } from "@/lib/utils";
 import {
   ChevronDown,
   Type,
@@ -47,7 +41,7 @@ import {
   Eye,
   Pencil,
   RotateCcw,
-} from 'lucide-react';
+} from "lucide-react";
 
 interface ImportReviewPanelProps {
   nodes: ReviewNode[];
@@ -69,19 +63,19 @@ interface ImportReviewPanelProps {
 }
 
 const CENTERED_LEVELS: { level: StructuralLevel; label: string }[] = [
-  { level: 'book', label: 'Book' },
-  { level: 'part', label: 'Part' },
-  { level: 'chapter', label: 'Chapter' },
-  { level: 'section', label: 'Section' },
-  { level: 'article', label: 'Article' },
+  { level: "book", label: "Book" },
+  { level: "part", label: "Part" },
+  { level: "chapter", label: "Chapter" },
+  { level: "section", label: "Section" },
+  { level: "article", label: "Article" },
 ];
 
 const LEFT_LEVELS: { level: StructuralLevel; label: string }[] = [
-  { level: 'roman', label: 'Roman Numeral (I., II.)' },
-  { level: 'subsection', label: 'Subsection' },
-  { level: 'brief', label: 'IN BRIEF' },
-  { level: 'preface', label: 'Preface/Greeting' },
-  { level: 'heading', label: 'Generic Heading' },
+  { level: "roman", label: "Roman Numeral (I., II.)" },
+  { level: "subsection", label: "Subsection" },
+  { level: "brief", label: "IN BRIEF" },
+  { level: "preface", label: "Preface/Greeting" },
+  { level: "heading", label: "Generic Heading" },
 ];
 
 export function ImportReviewPanel({
@@ -103,7 +97,7 @@ export function ImportReviewPanel({
   onReset,
 }: ImportReviewPanelProps) {
   const [editingNode, setEditingNode] = useState<ReviewNode | null>(null);
-  const [editContent, setEditContent] = useState('');
+  const [editContent, setEditContent] = useState("");
   const [splitDialogNode, setSplitDialogNode] = useState<ReviewNode | null>(null);
   const [splitPosition, setSplitPosition] = useState(0);
 
@@ -131,10 +125,10 @@ export function ImportReviewPanel({
     }
   };
 
-  const getNodeIndex = (tempId: string) => nodes.findIndex(n => n.tempId === tempId);
+  const getNodeIndex = (tempId: string) => nodes.findIndex((n) => n.tempId === tempId);
 
   return (
-    <div className="flex flex-col h-full min-h-0">
+    <div className="flex flex-col min-h-0">
       {/* Stats Bar - Fixed header */}
       <div className="shrink-0 flex items-center justify-between p-3 bg-muted/50 border-b">
         <div className="flex flex-wrap gap-3 text-sm">
@@ -245,9 +239,7 @@ export function ImportReviewPanel({
                 </div>
                 <div className="p-3 bg-muted/50 rounded-md">
                   <div className="text-xs text-muted-foreground mb-1">Second part:</div>
-                  <p className="text-sm">
-                    {splitDialogNode.content.substring(splitPosition)}
-                  </p>
+                  <p className="text-sm">{splitDialogNode.content.substring(splitPosition)}</p>
                 </div>
               </div>
             </div>
@@ -275,8 +267,8 @@ interface ReviewNodeItemProps {
   isFirst: boolean;
   isLast: boolean;
   isSelected: boolean;
-  prevNodeType: ReviewNode['nodeType'] | null;
-  nextNodeType: ReviewNode['nodeType'] | null;
+  prevNodeType: ReviewNode["nodeType"] | null;
+  nextNodeType: ReviewNode["nodeType"] | null;
   onSelect: () => void;
   onMakeCenteredTitle: (level?: StructuralLevel) => void;
   onMakeLeftSubtitle: (level?: StructuralLevel) => void;
@@ -311,39 +303,36 @@ function ReviewNodeItem({
   onEditNumber,
 }: ReviewNodeItemProps) {
   const [isEditingNumber, setIsEditingNumber] = useState(false);
-  const [tempNumber, setTempNumber] = useState(node.displayNumber || '');
+  const [tempNumber, setTempNumber] = useState(node.displayNumber || "");
 
   const handleNumberSubmit = () => {
     onEditNumber(tempNumber);
     setIsEditingNumber(false);
   };
 
-  const canMergeWithPrev = !isFirst && prevNodeType === 'citable' && node.nodeType === 'citable';
-  const canMergeWithNext = !isLast && nextNodeType === 'citable' && node.nodeType === 'citable';
-  const canSplit = node.nodeType === 'citable' && node.content.length > 10;
+  const canMergeWithPrev = !isFirst && prevNodeType === "citable" && node.nodeType === "citable";
+  const canMergeWithNext = !isLast && nextNodeType === "citable" && node.nodeType === "citable";
+  const canSplit = node.nodeType === "citable" && node.content.length > 10;
 
   return (
     <div
       className={cn(
-        'group relative flex items-start gap-2 p-2 rounded-md border transition-colors',
-        isSelected && 'border-primary bg-primary/5',
-        !isSelected && 'border-transparent hover:bg-muted/50',
-        node.nodeType === 'ignored' && 'opacity-50',
-        node.modified && 'ring-1 ring-amber-500/30'
+        "group relative flex items-start gap-2 p-2 rounded-md border transition-colors",
+        isSelected && "border-primary bg-primary/5",
+        !isSelected && "border-transparent hover:bg-muted/50",
+        node.nodeType === "ignored" && "opacity-50",
+        node.modified && "ring-1 ring-amber-500/30",
       )}
       onClick={onSelect}
     >
       {/* Type Badge */}
       <div className="flex-shrink-0 w-20 pt-0.5">
-        {node.nodeType === 'structural' && (
+        {node.nodeType === "structural" && (
           <Badge
             variant="outline"
-            className={cn(
-              'text-xs',
-              node.alignment === 'center' && 'bg-primary/10 text-primary border-primary/30'
-            )}
+            className={cn("text-xs", node.alignment === "center" && "bg-primary/10 text-primary border-primary/30")}
           >
-            {node.alignment === 'center' ? (
+            {node.alignment === "center" ? (
               <AlignCenter className="h-3 w-3 mr-1" />
             ) : (
               <AlignLeft className="h-3 w-3 mr-1" />
@@ -351,14 +340,14 @@ function ReviewNodeItem({
             {node.level}
           </Badge>
         )}
-        {node.nodeType === 'citable' && (
+        {node.nodeType === "citable" && (
           <div className="flex items-center gap-1">
             {isEditingNumber ? (
               <Input
                 value={tempNumber}
                 onChange={(e) => setTempNumber(e.target.value)}
                 onBlur={handleNumberSubmit}
-                onKeyDown={(e) => e.key === 'Enter' && handleNumberSubmit()}
+                onKeyDown={(e) => e.key === "Enter" && handleNumberSubmit()}
                 className="h-6 w-12 text-xs text-center"
                 autoFocus
                 onClick={(e) => e.stopPropagation()}
@@ -369,7 +358,7 @@ function ReviewNodeItem({
                 className="cursor-pointer hover:bg-secondary/80"
                 onClick={(e) => {
                   e.stopPropagation();
-                  setTempNumber(node.displayNumber || '');
+                  setTempNumber(node.displayNumber || "");
                   setIsEditingNumber(true);
                 }}
               >
@@ -379,7 +368,7 @@ function ReviewNodeItem({
             )}
           </div>
         )}
-        {node.nodeType === 'ignored' && (
+        {node.nodeType === "ignored" && (
           <Badge variant="outline" className="text-xs text-muted-foreground">
             <EyeOff className="h-3 w-3 mr-1" />
             Ignored
@@ -391,10 +380,10 @@ function ReviewNodeItem({
       <div className="flex-1 min-w-0">
         <p
           className={cn(
-            'text-sm line-clamp-2',
-            node.nodeType === 'structural' && 'font-semibold',
-            node.nodeType === 'structural' && node.alignment === 'center' && 'text-center',
-            node.nodeType === 'ignored' && 'line-through text-muted-foreground'
+            "text-sm line-clamp-2",
+            node.nodeType === "structural" && "font-semibold",
+            node.nodeType === "structural" && node.alignment === "center" && "text-center",
+            node.nodeType === "ignored" && "line-through text-muted-foreground",
           )}
         >
           {node.content}
@@ -418,10 +407,7 @@ function ReviewNodeItem({
               </DropdownMenuSubTrigger>
               <DropdownMenuSubContent>
                 {CENTERED_LEVELS.map(({ level, label }) => (
-                  <DropdownMenuItem
-                    key={level}
-                    onClick={() => onMakeCenteredTitle(level)}
-                  >
+                  <DropdownMenuItem key={level} onClick={() => onMakeCenteredTitle(level)}>
                     {label}
                   </DropdownMenuItem>
                 ))}
@@ -435,10 +421,7 @@ function ReviewNodeItem({
               </DropdownMenuSubTrigger>
               <DropdownMenuSubContent>
                 {LEFT_LEVELS.map(({ level, label }) => (
-                  <DropdownMenuItem
-                    key={level}
-                    onClick={() => onMakeLeftSubtitle(level)}
-                  >
+                  <DropdownMenuItem key={level} onClick={() => onMakeLeftSubtitle(level)}>
                     {label}
                   </DropdownMenuItem>
                 ))}
@@ -483,7 +466,7 @@ function ReviewNodeItem({
             <DropdownMenuSeparator />
 
             {/* Ignore/Restore */}
-            {node.nodeType !== 'ignored' ? (
+            {node.nodeType !== "ignored" ? (
               <DropdownMenuItem onClick={onIgnore} className="text-muted-foreground">
                 <EyeOff className="h-4 w-4 mr-2" />
                 Ignore
