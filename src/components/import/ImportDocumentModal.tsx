@@ -1,7 +1,10 @@
 /**
  * ImportDocumentModal - Document import with file upload and local parsing
  * 
- * All parsing runs client-side - no server required.
+ * Supports: TXT, MD, PDF, DOC, DOCX
+ * All text extraction and parsing runs client-side - no server required.
+ * 
+ * Pipeline: File → Text Extraction → Normalized Plain Text → Structural Parser → Nodes
  */
 
 import { useState, useCallback } from 'react';
@@ -14,8 +17,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useLocalDocuments } from '@/hooks/useLocalDocuments';
 import { parseDocument, ParsedNode } from '@/lib/parser/documentParser';
+import { extractTextFromFile, getAcceptedFileTypes } from '@/lib/textExtractor';
 import { toast } from '@/hooks/use-toast';
-import { Loader2, Upload, AlertCircle } from 'lucide-react';
+import { Loader2, Upload, AlertCircle, FileText } from 'lucide-react';
 import { DocumentCategory, SourceType } from '@/lib/db';
 import { DocumentNode } from '@/types/document';
 
@@ -91,24 +95,20 @@ export function ImportDocumentModal({ open, onOpenChange, onSuccess }: ImportDoc
     setTitle(baseName);
 
     try {
-      const fileType = file.name.split('.').pop()?.toLowerCase();
+      // Use unified text extraction for all file types
+      const text = await extractTextFromFile(file);
+      setRawText(text);
+      setStep('configure');
       
-      if (fileType === 'txt' || fileType === 'md') {
-        // Direct text reading
-        const text = await file.text();
-        setRawText(text);
-        setStep('configure');
-      } else {
-        toast({
-          title: 'Unsupported format',
-          description: 'Please use TXT or MD files, or paste text directly.',
-          variant: 'destructive',
-        });
-      }
+      toast({
+        title: 'File loaded',
+        description: `Extracted ${text.length.toLocaleString()} characters from ${file.name}`,
+      });
     } catch (err: any) {
+      console.error('File extraction error:', err);
       toast({
         title: 'Error reading file',
-        description: err.message,
+        description: err.message || 'Could not extract text from file.',
         variant: 'destructive',
       });
     } finally {
@@ -217,7 +217,7 @@ export function ImportDocumentModal({ open, onOpenChange, onSuccess }: ImportDoc
                 <div className="border-2 border-dashed border-border rounded-lg p-8 text-center hover:border-primary/50 transition-colors">
                   <input
                     type="file"
-                    accept=".txt,.md"
+                    accept={getAcceptedFileTypes()}
                     onChange={handleFileChange}
                     className="hidden"
                     id="file-upload"
@@ -232,7 +232,10 @@ export function ImportDocumentModal({ open, onOpenChange, onSuccess }: ImportDoc
                       <Upload className="h-10 w-10 text-muted-foreground" />
                     )}
                     <span className="text-sm text-muted-foreground">
-                      {fileName || 'Click to upload TXT or MD files'}
+                      {fileName || 'Click to upload a document'}
+                    </span>
+                    <span className="text-xs text-muted-foreground/70">
+                      Supports: TXT, MD, PDF, DOC, DOCX
                     </span>
                   </label>
                 </div>
