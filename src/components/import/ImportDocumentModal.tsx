@@ -1,21 +1,23 @@
 /**
- * ImportDocumentModal - Document import with file upload and parsing
+ * ImportDocumentModal - Document import with file upload and local parsing
+ * 
+ * All parsing runs client-side - no server required.
  */
 
-import { useState, useCallback } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { useDocuments } from "@/hooks/useDocuments";
-import { toast } from "@/hooks/use-toast";
-import { Loader2, Upload, FileText, AlertCircle } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
-import { DocumentCategory, SourceType } from "@/types/database";
-import { DocumentNode } from "@/types/document";
+import { useState, useCallback } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { useLocalDocuments } from '@/hooks/useLocalDocuments';
+import { parseDocument, ParsedNode } from '@/lib/parser/documentParser';
+import { toast } from '@/hooks/use-toast';
+import { Loader2, Upload, AlertCircle } from 'lucide-react';
+import { DocumentCategory, SourceType } from '@/lib/db';
+import { DocumentNode } from '@/types/document';
 
 interface ImportDocumentModalProps {
   open: boolean;
@@ -23,51 +25,51 @@ interface ImportDocumentModalProps {
   onSuccess?: () => void;
 }
 
-type ImportStep = "upload" | "configure" | "preview";
+type ImportStep = 'upload' | 'configure' | 'preview';
 
 const CATEGORY_OPTIONS: { value: DocumentCategory; label: string }[] = [
-  { value: "scripture", label: "Scripture" },
-  { value: "catechism", label: "Catechism" },
-  { value: "patristic", label: "Patristic" },
-  { value: "commentary", label: "Commentary" },
-  { value: "custom", label: "Custom" },
+  { value: 'scripture', label: 'Scripture' },
+  { value: 'catechism', label: 'Catechism' },
+  { value: 'patristic', label: 'Patristic' },
+  { value: 'commentary', label: 'Commentary' },
+  { value: 'custom', label: 'Custom' },
 ];
 
 const SOURCE_TYPE_OPTIONS: { value: SourceType; label: string; description: string }[] = [
-  { value: "catechism", label: "Catechism", description: "Numbered paragraphs 1-2865" },
-  { value: "scripture", label: "Scripture", description: "Book:chapter:verse format" },
-  { value: "patristic", label: "Patristic", description: "Chapter titles, numbered prose" },
-  { value: "treatise", label: "Treatise", description: "Theological works with sections" },
-  { value: "generic", label: "Generic", description: "General numbered paragraphs" },
+  { value: 'catechism', label: 'Catechism', description: 'Numbered paragraphs 1-2865' },
+  { value: 'scripture', label: 'Scripture', description: 'Book:chapter:verse format' },
+  { value: 'patristic', label: 'Patristic', description: 'Chapter titles, numbered prose' },
+  { value: 'treatise', label: 'Treatise', description: 'Theological works with sections' },
+  { value: 'generic', label: 'Generic', description: 'General numbered paragraphs' },
 ];
 
 export function ImportDocumentModal({ open, onOpenChange, onSuccess }: ImportDocumentModalProps) {
-  const { saveDocument } = useDocuments();
-  const [step, setStep] = useState<ImportStep>("upload");
+  const { saveDocument } = useLocalDocuments();
+  const [step, setStep] = useState<ImportStep>('upload');
   const [loading, setLoading] = useState(false);
   
   // File state
-  const [rawText, setRawText] = useState("");
-  const [fileName, setFileName] = useState("");
+  const [rawText, setRawText] = useState('');
+  const [fileName, setFileName] = useState('');
   
   // Metadata state
-  const [title, setTitle] = useState("");
-  const [author, setAuthor] = useState("");
-  const [category, setCategory] = useState<DocumentCategory>("custom");
-  const [sourceType, setSourceType] = useState<SourceType>("generic");
+  const [title, setTitle] = useState('');
+  const [author, setAuthor] = useState('');
+  const [category, setCategory] = useState<DocumentCategory>('custom');
+  const [sourceType, setSourceType] = useState<SourceType>('generic');
   
   // Parsed result
   const [parsedNodes, setParsedNodes] = useState<DocumentNode[]>([]);
   const [parseStats, setParseStats] = useState<{ total: number; structural: number; citable: number } | null>(null);
 
   const resetState = () => {
-    setStep("upload");
-    setRawText("");
-    setFileName("");
-    setTitle("");
-    setAuthor("");
-    setCategory("custom");
-    setSourceType("generic");
+    setStep('upload');
+    setRawText('');
+    setFileName('');
+    setTitle('');
+    setAuthor('');
+    setCategory('custom');
+    setSourceType('generic');
     setParsedNodes([]);
     setParseStats(null);
   };
@@ -85,49 +87,29 @@ export function ImportDocumentModal({ open, onOpenChange, onSuccess }: ImportDoc
     setFileName(file.name);
     
     // Extract title from filename
-    const baseName = file.name.replace(/\.[^/.]+$/, "");
+    const baseName = file.name.replace(/\.[^/.]+$/, '');
     setTitle(baseName);
 
     try {
-      const fileType = file.name.split(".").pop()?.toLowerCase();
+      const fileType = file.name.split('.').pop()?.toLowerCase();
       
-      if (fileType === "txt" || fileType === "md") {
+      if (fileType === 'txt' || fileType === 'md') {
         // Direct text reading
         const text = await file.text();
         setRawText(text);
-        setStep("configure");
-      } else if (fileType === "pdf" || fileType === "docx") {
-        // For PDF/DOCX, we need server-side parsing
-        // Use the document parser tool
-        toast({
-          title: "Processing file",
-          description: "Extracting text from document...",
-        });
-        
-        // Read as base64 for potential future server-side parsing
-        const reader = new FileReader();
-        reader.onload = async () => {
-          // For now, show instruction to use TXT/MD
-          toast({
-            title: "PDF/DOCX Support",
-            description: "For best results, please convert your document to TXT or paste the text directly.",
-            variant: "default",
-          });
-          setStep("configure");
-        };
-        reader.readAsDataURL(file);
+        setStep('configure');
       } else {
         toast({
-          title: "Unsupported format",
-          description: "Please use TXT, MD, PDF, or DOCX files.",
-          variant: "destructive",
+          title: 'Unsupported format',
+          description: 'Please use TXT or MD files, or paste text directly.',
+          variant: 'destructive',
         });
       }
     } catch (err: any) {
       toast({
-        title: "Error reading file",
+        title: 'Error reading file',
         description: err.message,
-        variant: "destructive",
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
@@ -137,42 +119,39 @@ export function ImportDocumentModal({ open, onOpenChange, onSuccess }: ImportDoc
   const handlePaste = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setRawText(e.target.value);
     if (e.target.value.length > 100) {
-      setStep("configure");
+      setStep('configure');
     }
   };
 
   const handleParse = async () => {
     if (!rawText.trim()) {
       toast({
-        title: "No content",
-        description: "Please upload a file or paste text to import.",
-        variant: "destructive",
+        title: 'No content',
+        description: 'Please upload a file or paste text to import.',
+        variant: 'destructive',
       });
       return;
     }
 
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke("parse-document", {
-        body: { text: rawText, sourceType },
-      });
+      // Parse locally - no server required
+      const result = parseDocument(rawText, sourceType);
 
-      if (error) throw error;
-
-      const nodes: DocumentNode[] = data.nodes.map((n: any, index: number) => ({
+      const nodes: DocumentNode[] = result.nodes.map((n: ParsedNode, index: number) => ({
         ...n,
         id: `temp-${index}`,
-      }));
+      })) as DocumentNode[];
 
       setParsedNodes(nodes);
-      setParseStats(data.stats);
-      setStep("preview");
+      setParseStats(result.stats);
+      setStep('preview');
     } catch (err: any) {
-      console.error("Parse error:", err);
+      console.error('Parse error:', err);
       toast({
-        title: "Parsing failed",
-        description: err.message || "Could not parse document.",
-        variant: "destructive",
+        title: 'Parsing failed',
+        description: err.message || 'Could not parse document.',
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
@@ -182,9 +161,9 @@ export function ImportDocumentModal({ open, onOpenChange, onSuccess }: ImportDoc
   const handleSave = async () => {
     if (!title.trim()) {
       toast({
-        title: "Title required",
-        description: "Please enter a document title.",
-        variant: "destructive",
+        title: 'Title required',
+        description: 'Please enter a document title.',
+        variant: 'destructive',
       });
       return;
     }
@@ -201,7 +180,7 @@ export function ImportDocumentModal({ open, onOpenChange, onSuccess }: ImportDoc
       );
 
       toast({
-        title: "Document imported",
+        title: 'Document imported',
         description: `"${title}" has been added to your library.`,
       });
 
@@ -209,9 +188,9 @@ export function ImportDocumentModal({ open, onOpenChange, onSuccess }: ImportDoc
       onSuccess?.();
     } catch (err: any) {
       toast({
-        title: "Save failed",
+        title: 'Save failed',
         description: err.message,
-        variant: "destructive",
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
@@ -223,14 +202,14 @@ export function ImportDocumentModal({ open, onOpenChange, onSuccess }: ImportDoc
       <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col bg-card">
         <DialogHeader>
           <DialogTitle className="font-display text-xl">
-            {step === "upload" && "Import Document"}
-            {step === "configure" && "Configure Import"}
-            {step === "preview" && "Preview & Save"}
+            {step === 'upload' && 'Import Document'}
+            {step === 'configure' && 'Configure Import'}
+            {step === 'preview' && 'Preview & Save'}
           </DialogTitle>
         </DialogHeader>
 
         <ScrollArea className="flex-1 px-1">
-          {step === "upload" && (
+          {step === 'upload' && (
             <div className="space-y-6 py-4">
               {/* File Upload */}
               <div className="space-y-2">
@@ -238,7 +217,7 @@ export function ImportDocumentModal({ open, onOpenChange, onSuccess }: ImportDoc
                 <div className="border-2 border-dashed border-border rounded-lg p-8 text-center hover:border-primary/50 transition-colors">
                   <input
                     type="file"
-                    accept=".txt,.md,.pdf,.docx"
+                    accept=".txt,.md"
                     onChange={handleFileChange}
                     className="hidden"
                     id="file-upload"
@@ -253,7 +232,7 @@ export function ImportDocumentModal({ open, onOpenChange, onSuccess }: ImportDoc
                       <Upload className="h-10 w-10 text-muted-foreground" />
                     )}
                     <span className="text-sm text-muted-foreground">
-                      {fileName || "Click to upload TXT, MD, PDF, or DOCX"}
+                      {fileName || 'Click to upload TXT or MD files'}
                     </span>
                   </label>
                 </div>
@@ -279,14 +258,14 @@ export function ImportDocumentModal({ open, onOpenChange, onSuccess }: ImportDoc
               </div>
 
               {rawText.length > 0 && (
-                <Button onClick={() => setStep("configure")} className="w-full">
+                <Button onClick={() => setStep('configure')} className="w-full">
                   Continue with pasted text
                 </Button>
               )}
             </div>
           )}
 
-          {step === "configure" && (
+          {step === 'configure' && (
             <div className="space-y-4 py-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -352,7 +331,7 @@ export function ImportDocumentModal({ open, onOpenChange, onSuccess }: ImportDoc
                 <div className="bg-muted/50 rounded-md p-4 max-h-48 overflow-auto">
                   <pre className="text-xs whitespace-pre-wrap font-mono">
                     {rawText.substring(0, 1000)}
-                    {rawText.length > 1000 && "..."}
+                    {rawText.length > 1000 && '...'}
                   </pre>
                 </div>
                 <p className="text-xs text-muted-foreground">
@@ -362,7 +341,7 @@ export function ImportDocumentModal({ open, onOpenChange, onSuccess }: ImportDoc
             </div>
           )}
 
-          {step === "preview" && (
+          {step === 'preview' && (
             <div className="space-y-4 py-4">
               {parseStats && (
                 <div className="flex gap-4 p-4 bg-muted/50 rounded-md">
@@ -388,12 +367,12 @@ export function ImportDocumentModal({ open, onOpenChange, onSuccess }: ImportDoc
                     <div
                       key={i}
                       className={`text-sm ${
-                        node.nodeType === "structural"
-                          ? "font-bold text-primary"
-                          : "text-foreground"
+                        node.nodeType === 'structural'
+                          ? 'font-bold text-primary'
+                          : 'text-foreground'
                       }`}
                     >
-                      {node.nodeType === "structural" ? (
+                      {node.nodeType === 'structural' ? (
                         <span className="flex items-center gap-2">
                           <span className="text-xs bg-primary/20 px-1 rounded">
                             {(node as any).level}
@@ -431,24 +410,24 @@ export function ImportDocumentModal({ open, onOpenChange, onSuccess }: ImportDoc
         </ScrollArea>
 
         <DialogFooter className="gap-2">
-          {step !== "upload" && (
+          {step !== 'upload' && (
             <Button
               variant="outline"
-              onClick={() => setStep(step === "preview" ? "configure" : "upload")}
+              onClick={() => setStep(step === 'preview' ? 'configure' : 'upload')}
               disabled={loading}
             >
               Back
             </Button>
           )}
           
-          {step === "configure" && (
+          {step === 'configure' && (
             <Button onClick={handleParse} disabled={loading || !rawText.trim()}>
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Parse Document
             </Button>
           )}
           
-          {step === "preview" && (
+          {step === 'preview' && (
             <Button onClick={handleSave} disabled={loading || parsedNodes.length === 0}>
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Save to Library

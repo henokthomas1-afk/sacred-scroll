@@ -1,19 +1,20 @@
 /**
  * NotesPanel - Sidebar panel for viewing and managing notes
+ * 
+ * Works entirely offline with IndexedDB storage.
  */
 
-import { useState } from "react";
-import { useNotes, NoteWithCitations } from "@/hooks/useNotes";
-import { useAuth } from "@/hooks/useAuth";
-import { NoteCard } from "./NoteCard";
-import { NoteEditor } from "./NoteEditor";
-import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, FileText, Layers, BookOpen, Loader2 } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { NoteType } from "@/types/database";
-import { toast } from "@/hooks/use-toast";
+import { useState } from 'react';
+import { useLocalNotes, NoteWithCitations } from '@/hooks/useLocalNotes';
+import { NoteCard } from './NoteCard';
+import { NoteEditor } from './NoteEditor';
+import { Button } from '@/components/ui/button';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Plus, FileText, Layers, BookOpen, Loader2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { NoteType } from '@/lib/db';
+import { toast } from '@/hooks/use-toast';
 
 interface NotesPanelProps {
   documentId: string | null;
@@ -30,8 +31,7 @@ export function NotesPanel({
   onCitationClick,
   className,
 }: NotesPanelProps) {
-  const { isAuthenticated } = useAuth();
-  const { notes, loading, createNote, updateNote, deleteNote } = useNotes(documentId);
+  const { notes, loading, createNote, updateNote, deleteNote } = useLocalNotes(documentId);
   const [creatingNote, setCreatingNote] = useState<NoteType | null>(null);
 
   const handleCreateNote = async (content: string) => {
@@ -41,18 +41,18 @@ export function NotesPanel({
       await createNote(
         creatingNote,
         content,
-        creatingNote === "paragraph" ? selectedNodeId || undefined : undefined
+        creatingNote === 'paragraph' ? selectedNodeId || undefined : undefined
       );
       setCreatingNote(null);
       toast({
-        title: "Note saved",
-        description: "Your note has been added.",
+        title: 'Note saved',
+        description: 'Your note has been added.',
       });
     } catch (err: any) {
       toast({
-        title: "Error",
+        title: 'Error',
         description: err.message,
-        variant: "destructive",
+        variant: 'destructive',
       });
     }
   };
@@ -60,7 +60,7 @@ export function NotesPanel({
   const handleUpdateNote = async (noteId: string, content: string) => {
     const success = await updateNote(noteId, content);
     if (success) {
-      toast({ title: "Note updated" });
+      toast({ title: 'Note updated' });
     }
     return success;
   };
@@ -68,35 +68,26 @@ export function NotesPanel({
   const handleDeleteNote = async (noteId: string) => {
     const success = await deleteNote(noteId);
     if (success) {
-      toast({ title: "Note deleted" });
+      toast({ title: 'Note deleted' });
     }
     return success;
   };
 
   // Group notes by type
-  const documentNotes = notes.filter((n) => n.note_type === "document");
-  const sectionNotes = notes.filter((n) => n.note_type === "section");
-  const paragraphNotes = notes.filter((n) => n.note_type === "paragraph");
+  const documentNotes = notes.filter((n) => n.type === 'document');
+  const sectionNotes = notes.filter((n) => n.type === 'section');
+  const paragraphNotes = notes.filter((n) => n.type === 'paragraph');
 
   if (!documentId) {
     return (
-      <div className={cn("flex items-center justify-center h-full text-muted-foreground", className)}>
+      <div className={cn('flex items-center justify-center h-full text-muted-foreground', className)}>
         <p>Select a document to view notes</p>
       </div>
     );
   }
 
-  if (!isAuthenticated) {
-    return (
-      <div className={cn("flex flex-col items-center justify-center h-full text-center p-4", className)}>
-        <FileText className="h-10 w-10 text-muted-foreground mb-2" />
-        <p className="text-muted-foreground">Sign in to create and view notes</p>
-      </div>
-    );
-  }
-
   return (
-    <div className={cn("flex flex-col h-full", className)}>
+    <div className={cn('flex flex-col h-full', className)}>
       <div className="p-4 border-b border-border">
         <h2 className="font-display font-semibold">Notes</h2>
         {documentTitle && (
@@ -121,7 +112,7 @@ export function NotesPanel({
             <>
               <TabsContent value="all" className="p-4 space-y-3 mt-0">
                 {notes.length === 0 ? (
-                  <EmptyNotes onAdd={() => setCreatingNote("document")} />
+                  <EmptyNotes onAdd={() => setCreatingNote('document')} />
                 ) : (
                   notes.map((note) => (
                     <NoteCard
