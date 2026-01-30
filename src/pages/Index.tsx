@@ -1,54 +1,49 @@
 /**
  * Sacred Text Reader - Main Page
  * 
- * A scholarly document reader for religious texts with
- * correct structural parsing and reliable citations.
+ * A local-first, offline-capable scholarly document reader
+ * for religious texts with citation-safe parsing.
  */
 
-import { useState, useMemo, useCallback } from "react";
-import { ParsedDocument } from "@/types/document";
-import { DocumentLibrary, SplitScreenReader, DocumentSelector } from "@/components/reader";
-import { NotesPanel } from "@/components/notes";
-import { sampleDocuments } from "@/lib/sampleDocuments";
-import { Button } from "@/components/ui/button";
-import { BookOpen, Menu, Plus, User, LogOut, PanelRightOpen, PanelRightClose } from "lucide-react";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { useIsMobile } from "@/hooks/use-mobile";
-import { useAuth } from "@/hooks/useAuth";
-import { useDocuments } from "@/hooks/useDocuments";
-import { AuthModal } from "@/components/auth/AuthModal";
-import { ImportDocumentModal } from "@/components/import/ImportDocumentModal";
+import { useState, useMemo, useCallback } from 'react';
+import { ParsedDocument } from '@/types/document';
+import { DocumentLibrary, SplitScreenReader, DocumentSelector } from '@/components/reader';
+import { NotesPanel } from '@/components/notes';
+import { sampleDocuments } from '@/lib/sampleDocuments';
+import { Button } from '@/components/ui/button';
+import { BookOpen, Menu, Plus, PanelRightOpen, PanelRightClose, Download, Upload } from 'lucide-react';
+import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { useLocalDocuments } from '@/hooks/useLocalDocuments';
+import { ImportDocumentModal } from '@/components/import/ImportDocumentModal';
+import { exportToFile, importFromFile } from '@/lib/sync/syncManager';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
-import { toast } from "@/hooks/use-toast";
+  DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu';
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
+import { toast } from '@/hooks/use-toast';
 
 export default function Index() {
-  const { user, isAuthenticated, signOut, loading: authLoading } = useAuth();
-  const { documents: userDocuments, loading: docsLoading, refreshDocuments } = useDocuments();
+  const { documents: userDocuments, loading: docsLoading, refreshDocuments } = useLocalDocuments();
   
   const [selectedDocument, setSelectedDocument] = useState<ParsedDocument | null>(null);
   const [secondaryDocument, setSecondaryDocument] = useState<ParsedDocument | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [notesPanelOpen, setNotesPanelOpen] = useState(false);
-  const [authModalOpen, setAuthModalOpen] = useState(false);
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [documentSelectorOpen, setDocumentSelectorOpen] = useState(false);
   
   const isMobile = useIsMobile();
 
-  // Combine sample documents with user documents
+  // Combine user documents with sample documents
   const allDocuments = useMemo(() => {
-    if (isAuthenticated) {
-      return [...userDocuments, ...sampleDocuments];
-    }
-    return sampleDocuments;
-  }, [isAuthenticated, userDocuments]);
+    return [...userDocuments, ...sampleDocuments];
+  }, [userDocuments]);
 
   // Set initial document
   useMemo(() => {
@@ -76,16 +71,50 @@ export default function Index() {
     setSecondaryDocument(null);
   }, []);
 
-  const handleImportClick = useCallback(() => {
-    if (!isAuthenticated) {
-      setAuthModalOpen(true);
-    } else {
-      setImportModalOpen(true);
-    }
-  }, [isAuthenticated]);
-
   const handleImportSuccess = useCallback(() => {
     refreshDocuments();
+  }, [refreshDocuments]);
+
+  const handleExportLibrary = useCallback(async () => {
+    try {
+      await exportToFile();
+      toast({
+        title: 'Library exported',
+        description: 'Your library has been downloaded as library.json',
+      });
+    } catch (err: any) {
+      toast({
+        title: 'Export failed',
+        description: err.message,
+        variant: 'destructive',
+      });
+    }
+  }, []);
+
+  const handleImportLibrary = useCallback(async () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+
+      const result = await importFromFile(file);
+      if (result.success) {
+        toast({
+          title: 'Library imported',
+          description: `Added ${result.added} documents, updated ${result.updated}`,
+        });
+        refreshDocuments();
+      } else {
+        toast({
+          title: 'Import failed',
+          description: result.error,
+          variant: 'destructive',
+        });
+      }
+    };
+    input.click();
   }, [refreshDocuments]);
 
   // Handle citation navigation - find document and scroll to node
@@ -94,9 +123,9 @@ export default function Index() {
     
     if (!targetDoc) {
       toast({
-        title: "Document not found",
-        description: "The referenced document is not in your library.",
-        variant: "destructive",
+        title: 'Document not found',
+        description: 'The referenced document is not in your library.',
+        variant: 'destructive',
       });
       return;
     }
@@ -113,7 +142,7 @@ export default function Index() {
     if (nodeId) {
       setTimeout(() => {
         const element = document.querySelector(`[data-paragraph-id="${nodeId}"]`);
-        element?.scrollIntoView({ behavior: "smooth", block: "center" });
+        element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }, 100);
     }
   }, [allDocuments, selectedDocument, secondaryDocument]);
@@ -125,12 +154,12 @@ export default function Index() {
   // Header actions component
   const HeaderActions = () => (
     <div className="flex items-center gap-2">
-      {!isMobile && isAuthenticated && selectedDocument && (
+      {!isMobile && selectedDocument && (
         <Button
           variant="ghost"
           size="icon"
           onClick={() => setNotesPanelOpen(!notesPanelOpen)}
-          title={notesPanelOpen ? "Hide notes" : "Show notes"}
+          title={notesPanelOpen ? 'Hide notes' : 'Show notes'}
         >
           {notesPanelOpen ? (
             <PanelRightClose className="h-5 w-5" />
@@ -143,35 +172,34 @@ export default function Index() {
       <Button
         variant="outline"
         size="sm"
-        onClick={handleImportClick}
+        onClick={() => setImportModalOpen(true)}
         className="gap-2"
       >
         <Plus className="h-4 w-4" />
         <span className="hidden sm:inline">Import</span>
       </Button>
 
-      {authLoading ? null : isAuthenticated ? (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="rounded-full">
-              <User className="h-5 w-5" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem disabled className="text-xs text-muted-foreground">
-              {user?.email}
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={signOut}>
-              <LogOut className="h-4 w-4 mr-2" />
-              Sign Out
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      ) : (
-        <Button variant="ghost" size="sm" onClick={() => setAuthModalOpen(true)}>
-          Sign In
-        </Button>
-      )}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="icon">
+            <Menu className="h-5 w-5" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onClick={handleExportLibrary}>
+            <Download className="h-4 w-4 mr-2" />
+            Export Library
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={handleImportLibrary}>
+            <Upload className="h-4 w-4 mr-2" />
+            Import Library
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem disabled className="text-xs text-muted-foreground">
+            {userDocuments.length} documents stored locally
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   );
 
@@ -196,7 +224,7 @@ export default function Index() {
 
         {/* Main Content with optional Notes Panel */}
         <div className="flex-1 flex min-w-0">
-          {notesPanelOpen && isAuthenticated ? (
+          {notesPanelOpen ? (
             <ResizablePanelGroup direction="horizontal">
               <ResizablePanel defaultSize={75} minSize={50}>
                 <main className="h-full">
@@ -209,7 +237,7 @@ export default function Index() {
                       onNavigateToNode={handleCitationClick}
                     />
                   ) : (
-                    <EmptyState onImport={handleImportClick} isAuthenticated={isAuthenticated} />
+                    <EmptyState onImport={() => setImportModalOpen(true)} />
                   )}
                 </main>
               </ResizablePanel>
@@ -234,14 +262,13 @@ export default function Index() {
                   onNavigateToNode={handleCitationClick}
                 />
               ) : (
-                <EmptyState onImport={handleImportClick} isAuthenticated={isAuthenticated} />
+                <EmptyState onImport={() => setImportModalOpen(true)} />
               )}
             </main>
           )}
         </div>
 
         {/* Modals */}
-        <AuthModal open={authModalOpen} onOpenChange={setAuthModalOpen} />
         <ImportDocumentModal
           open={importModalOpen}
           onOpenChange={setImportModalOpen}
@@ -283,7 +310,7 @@ export default function Index() {
         </Sheet>
 
         <h1 className="font-display font-semibold text-lg truncate flex-1 text-center">
-          {selectedDocument?.metadata.title || "Sacred Text Reader"}
+          {selectedDocument?.metadata.title || 'Sacred Text Reader'}
         </h1>
 
         <HeaderActions />
@@ -298,12 +325,11 @@ export default function Index() {
             onNavigateToNode={handleCitationClick}
           />
         ) : (
-          <EmptyState onImport={handleImportClick} isAuthenticated={isAuthenticated} />
+          <EmptyState onImport={() => setImportModalOpen(true)} />
         )}
       </main>
 
       {/* Modals */}
-      <AuthModal open={authModalOpen} onOpenChange={setAuthModalOpen} />
       <ImportDocumentModal
         open={importModalOpen}
         onOpenChange={setImportModalOpen}
@@ -315,10 +341,9 @@ export default function Index() {
 
 interface EmptyStateProps {
   onImport: () => void;
-  isAuthenticated: boolean;
 }
 
-function EmptyState({ onImport, isAuthenticated }: EmptyStateProps) {
+function EmptyState({ onImport }: EmptyStateProps) {
   return (
     <div className="flex flex-col items-center justify-center h-full p-8 text-center">
       <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
@@ -333,7 +358,7 @@ function EmptyState({ onImport, isAuthenticated }: EmptyStateProps) {
       </p>
       <Button onClick={onImport} className="gap-2">
         <Plus className="h-4 w-4" />
-        {isAuthenticated ? "Import Document" : "Sign in to Import"}
+        Import Document
       </Button>
     </div>
   );

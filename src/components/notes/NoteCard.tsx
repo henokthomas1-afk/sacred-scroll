@@ -1,13 +1,15 @@
 /**
  * NoteCard - Display a single note with actions
+ * 
+ * Works with local IndexedDB storage.
  */
 
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { NoteWithCitations } from "@/hooks/useNotes";
-import { NoteEditor } from "./NoteEditor";
-import { Edit2, Trash2, Link, MessageSquare } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { NoteWithCitations } from '@/hooks/useLocalNotes';
+import { NoteEditor } from './NoteEditor';
+import { Edit2, Trash2, Link, MessageSquare } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -17,7 +19,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+} from '@/components/ui/alert-dialog';
 
 interface NoteCardProps {
   note: NoteWithCitations;
@@ -48,14 +50,14 @@ export function NoteCard({
   };
 
   const noteTypeLabel = {
-    document: "Document Note",
-    section: "Section Note",
-    paragraph: "Paragraph Note",
-  }[note.note_type];
+    document: 'Document Note',
+    section: 'Section Note',
+    paragraph: 'Paragraph Note',
+  }[note.type];
 
   if (editing) {
     return (
-      <div className={cn("p-3 bg-card border border-border rounded-md", className)}>
+      <div className={cn('p-3 bg-card border border-border rounded-md', className)}>
         <NoteEditor
           initialContent={note.content}
           onSave={handleSave}
@@ -67,7 +69,7 @@ export function NoteCard({
 
   return (
     <>
-      <div className={cn("p-3 bg-card border border-border rounded-md group", className)}>
+      <div className={cn('p-3 bg-card border border-border rounded-md group', className)}>
         <div className="flex items-start justify-between gap-2 mb-2">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <MessageSquare className="h-3 w-3" />
@@ -106,17 +108,17 @@ export function NoteCard({
                 key={citation.id}
                 className="block text-xs text-primary hover:underline cursor-pointer"
                 onClick={() =>
-                  onCitationClick?.(citation.target_document_id, citation.target_node_id || undefined)
+                  onCitationClick?.(citation.targetDocumentId, citation.targetNodeId || undefined)
                 }
               >
-                {citation.citation_text}
+                {citation.citationText}
               </button>
             ))}
           </div>
         )}
 
         <div className="mt-2 text-xs text-muted-foreground">
-          {new Date(note.created_at).toLocaleDateString()}
+          {new Date(note.createdAt).toLocaleDateString()}
         </div>
       </div>
 
