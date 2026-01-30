@@ -8,8 +8,11 @@
 import * as pdfjsLib from 'pdfjs-dist';
 import mammoth from 'mammoth';
 
-// Configure PDF.js worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+// Import worker as URL for local bundling (works offline)
+import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+
+// Configure PDF.js worker with locally bundled file
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
 // ============= Types =============
 
