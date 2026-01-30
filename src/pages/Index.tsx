@@ -8,10 +8,10 @@
 import { useState, useMemo, useCallback } from 'react';
 import { ParsedDocument } from '@/types/document';
 import { DocumentLibrary, SplitScreenReader, DocumentSelector } from '@/components/reader';
-import { NotesPanel } from '@/components/notes';
+import { NotesPanel, GlobalNotesPanel } from '@/components/notes';
 import { sampleDocuments } from '@/lib/sampleDocuments';
 import { Button } from '@/components/ui/button';
-import { BookOpen, Menu, Plus, PanelRightOpen, PanelRightClose, Download, Upload } from 'lucide-react';
+import { BookOpen, Menu, Plus, PanelRightOpen, PanelRightClose, Download, Upload, StickyNote } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useLocalDocuments } from '@/hooks/useLocalDocuments';
@@ -25,7 +25,10 @@ import {
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from '@/hooks/use-toast';
+
+type ViewMode = 'reader' | 'notes';
 
 export default function Index() {
   const { documents: userDocuments, loading: docsLoading, refreshDocuments } = useLocalDocuments();
@@ -37,6 +40,7 @@ export default function Index() {
   const [notesPanelOpen, setNotesPanelOpen] = useState(false);
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [documentSelectorOpen, setDocumentSelectorOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>('reader');
   
   const isMobile = useIsMobile();
 
@@ -207,24 +211,47 @@ export default function Index() {
   if (!isMobile) {
     return (
       <div className="flex h-screen bg-background">
-        {/* Sidebar */}
+        {/* Sidebar with tabs */}
         <aside className="w-72 flex-shrink-0 border-r border-border flex flex-col">
           <div className="p-4 border-b border-border flex items-center justify-between">
-            <h1 className="font-display font-semibold text-lg">Library</h1>
+            <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as ViewMode)} className="flex-1">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="reader" className="text-xs gap-1">
+                  <BookOpen className="h-3 w-3" />
+                  Library
+                </TabsTrigger>
+                <TabsTrigger value="notes" className="text-xs gap-1">
+                  <StickyNote className="h-3 w-3" />
+                  Notes
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
             <HeaderActions />
           </div>
-          <div className="flex-1 overflow-hidden">
-            <DocumentLibrary
-              documents={allDocuments}
-              selectedDocumentId={selectedDocument?.metadata.id || null}
-              onSelectDocument={handleSelectDocument}
-            />
-          </div>
+          
+          {viewMode === 'reader' ? (
+            <div className="flex-1 overflow-hidden">
+              <DocumentLibrary
+                documents={allDocuments}
+                selectedDocumentId={selectedDocument?.metadata.id || null}
+                onSelectDocument={handleSelectDocument}
+              />
+            </div>
+          ) : (
+            <div className="flex-1 overflow-hidden text-sm text-muted-foreground p-4">
+              <p>Switch to full Notes view →</p>
+            </div>
+          )}
         </aside>
 
-        {/* Main Content with optional Notes Panel */}
+        {/* Main Content */}
         <div className="flex-1 flex min-w-0">
-          {notesPanelOpen ? (
+          {viewMode === 'notes' ? (
+            <GlobalNotesPanel
+              onCitationClick={handleCitationClick}
+              className="flex-1"
+            />
+          ) : notesPanelOpen ? (
             <ResizablePanelGroup direction="horizontal">
               <ResizablePanel defaultSize={75} minSize={50}>
                 <main className="h-full">
