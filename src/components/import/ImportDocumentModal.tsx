@@ -553,7 +553,11 @@ function ReviewStep({
 
   return (
     <>
-      <div className="flex-1 overflow-hidden border rounded-md">
+      {/* 
+        Key fix: min-h-0 is critical for flex children to allow shrinking below content size
+        This enables the inner ScrollArea to calculate proper scrollable height
+      */}
+      <div className="flex-1 min-h-0 overflow-hidden border rounded-md flex flex-col">
         <ImportReviewPanel
           nodes={review.nodes}
           stats={review.stats}

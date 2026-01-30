@@ -134,10 +134,10 @@ export function ImportReviewPanel({
   const getNodeIndex = (tempId: string) => nodes.findIndex(n => n.tempId === tempId);
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Stats Bar */}
-      <div className="flex items-center justify-between p-3 bg-muted/50 border-b">
-        <div className="flex gap-3 text-sm">
+    <div className="flex flex-col h-full min-h-0">
+      {/* Stats Bar - Fixed header */}
+      <div className="shrink-0 flex items-center justify-between p-3 bg-muted/50 border-b">
+        <div className="flex flex-wrap gap-3 text-sm">
           <span className="text-muted-foreground">
             Total: <span className="font-medium text-foreground">{stats.total}</span>
           </span>
@@ -153,7 +153,7 @@ export function ImportReviewPanel({
             </span>
           )}
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 shrink-0">
           <Button variant="ghost" size="sm" onClick={onResequence}>
             <Hash className="h-4 w-4 mr-1" />
             Resequence
@@ -165,8 +165,8 @@ export function ImportReviewPanel({
         </div>
       </div>
 
-      {/* Node List */}
-      <ScrollArea className="flex-1">
+      {/* Node List - Scrollable content area */}
+      <ScrollArea className="flex-1 min-h-0">
         <div className="p-2 space-y-1">
           {nodes.map((node, index) => (
             <ReviewNodeItem
