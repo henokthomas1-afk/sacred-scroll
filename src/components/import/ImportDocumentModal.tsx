@@ -194,7 +194,7 @@ export function ImportDocumentModal({ open, onOpenChange, onSuccess }: ImportDoc
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col bg-card">
+      <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col bg-card overflow-hidden">
         <DialogHeader>
           <DialogTitle className="font-display text-xl">
             {step === "upload" && "Import Document"}
