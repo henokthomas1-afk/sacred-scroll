@@ -14,7 +14,186 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      document_nodes: {
+        Row: {
+          alignment: string | null
+          content: string
+          created_at: string
+          display_number: string | null
+          document_id: string
+          id: string
+          level: string | null
+          node_order: number
+          node_type: string
+          number: number | null
+        }
+        Insert: {
+          alignment?: string | null
+          content: string
+          created_at?: string
+          display_number?: string | null
+          document_id: string
+          id?: string
+          level?: string | null
+          node_order: number
+          node_type: string
+          number?: number | null
+        }
+        Update: {
+          alignment?: string | null
+          content?: string
+          created_at?: string
+          display_number?: string | null
+          document_id?: string
+          id?: string
+          level?: string | null
+          node_order?: number
+          node_type?: string
+          number?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_nodes_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      documents: {
+        Row: {
+          author: string | null
+          category: Database["public"]["Enums"]["document_category"]
+          created_at: string
+          id: string
+          raw_content: string | null
+          source_type: Database["public"]["Enums"]["source_type"]
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          author?: string | null
+          category?: Database["public"]["Enums"]["document_category"]
+          created_at?: string
+          id?: string
+          raw_content?: string | null
+          source_type?: Database["public"]["Enums"]["source_type"]
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          author?: string | null
+          category?: Database["public"]["Enums"]["document_category"]
+          created_at?: string
+          id?: string
+          raw_content?: string | null
+          source_type?: Database["public"]["Enums"]["source_type"]
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      note_citations: {
+        Row: {
+          citation_text: string
+          created_at: string
+          id: string
+          note_id: string
+          target_document_id: string
+          target_node_id: string | null
+        }
+        Insert: {
+          citation_text: string
+          created_at?: string
+          id?: string
+          note_id: string
+          target_document_id: string
+          target_node_id?: string | null
+        }
+        Update: {
+          citation_text?: string
+          created_at?: string
+          id?: string
+          note_id?: string
+          target_document_id?: string
+          target_node_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "note_citations_note_id_fkey"
+            columns: ["note_id"]
+            isOneToOne: false
+            referencedRelation: "notes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "note_citations_target_document_id_fkey"
+            columns: ["target_document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "note_citations_target_node_id_fkey"
+            columns: ["target_node_id"]
+            isOneToOne: false
+            referencedRelation: "document_nodes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notes: {
+        Row: {
+          content: string
+          created_at: string
+          document_id: string
+          id: string
+          node_id: string | null
+          note_type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          document_id: string
+          id?: string
+          node_id?: string | null
+          note_type: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          document_id?: string
+          id?: string
+          node_id?: string | null
+          note_type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notes_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notes_node_id_fkey"
+            columns: ["node_id"]
+            isOneToOne: false
+            referencedRelation: "document_nodes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -23,7 +202,18 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      document_category:
+        | "scripture"
+        | "catechism"
+        | "patristic"
+        | "commentary"
+        | "custom"
+      source_type:
+        | "catechism"
+        | "scripture"
+        | "patristic"
+        | "treatise"
+        | "generic"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +340,21 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      document_category: [
+        "scripture",
+        "catechism",
+        "patristic",
+        "commentary",
+        "custom",
+      ],
+      source_type: [
+        "catechism",
+        "scripture",
+        "patristic",
+        "treatise",
+        "generic",
+      ],
+    },
   },
 } as const
