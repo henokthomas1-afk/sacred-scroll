@@ -16,6 +16,7 @@ export interface GlobalNote {
   content: string;
   parentId: string | null; // null = root level
   order: number; // Float for stable insertion
+  fontSize: number; // Per-note font size
   createdAt: number;
   updatedAt: number;
 }
@@ -197,11 +198,19 @@ export async function createGlobalNote(
     content,
     parentId,
     order: maxOrder + 1,
+    fontSize: 16, // Default font size
     createdAt: timestamp,
     updatedAt: timestamp,
   });
 
   return id;
+}
+
+export async function updateGlobalNoteFontSize(id: string, fontSize: number): Promise<void> {
+  await notesDb.globalNotes.update(id, {
+    fontSize,
+    updatedAt: now(),
+  });
 }
 
 export async function updateGlobalNote(

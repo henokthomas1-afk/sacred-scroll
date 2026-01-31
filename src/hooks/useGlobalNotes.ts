@@ -15,6 +15,7 @@ import {
   deleteFolder,
   createGlobalNote,
   updateGlobalNote,
+  updateGlobalNoteFontSize,
   moveNote,
   deleteGlobalNote,
   getCitationsForGlobalNote,
@@ -142,6 +143,12 @@ export function useGlobalNotes() {
     await fetchData();
   };
 
+  const handleUpdateNoteFontSize = async (id: string, fontSize: number): Promise<void> => {
+    await updateGlobalNoteFontSize(id, fontSize);
+    // Don't refetch - font size updates are frequent and local
+    setNotes(prev => prev.map(n => n.id === id ? { ...n, fontSize } : n));
+  };
+
   const handleDeleteNote = async (id: string): Promise<void> => {
     await deleteGlobalNote(id);
     await fetchData();
@@ -215,6 +222,7 @@ export function useGlobalNotes() {
     // Note operations
     createNote: handleCreateNote,
     updateNote: handleUpdateNote,
+    updateNoteFontSize: handleUpdateNoteFontSize,
     deleteNote: handleDeleteNote,
     // Move operations
     moveItem: handleMoveItem,

@@ -1,15 +1,19 @@
 /**
- * GlobalNoteEditor - Full note editor with title, content, and citations
+ * GlobalNoteEditor - Full note editor with title, rich content, and citations
+ * 
+ * Now uses RichTextEditor for document-style formatting:
+ * - Bold, Underline, Highlight
+ * - Text alignment
+ * - Per-note font size
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { GlobalNote, NoteCitation } from '@/lib/db/notesDb';
+import { GlobalNote, NoteCitation, updateGlobalNoteFontSize } from '@/lib/db/notesDb';
 import { getGlobalNote, getCitationsForGlobalNote } from '@/lib/db/notesDb';
-import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Badge } from '@/components/ui/badge';
+import { RichTextEditor } from './RichTextEditor';
 import { 
   Link, 
   ExternalLink, 
@@ -23,6 +27,7 @@ import { toast } from '@/hooks/use-toast';
 interface GlobalNoteEditorProps {
   noteId: string;
   onUpdate: (id: string, updates: Partial<Pick<GlobalNote, 'title' | 'content'>>) => Promise<void>;
+  onFontSizeUpdate?: (id: string, fontSize: number) => Promise<void>;
   onCitationClick?: (documentId: string, nodeId?: string) => void;
   onRemoveCitation?: (citationId: string) => Promise<void>;
   className?: string;
@@ -31,6 +36,7 @@ interface GlobalNoteEditorProps {
 export function GlobalNoteEditor({
   noteId,
   onUpdate,
+  onFontSizeUpdate,
   onCitationClick,
   onRemoveCitation,
   className,
@@ -41,6 +47,7 @@ export function GlobalNoteEditor({
   const [saving, setSaving] = useState(false);
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
+  const [fontSize, setFontSize] = useState(16);
   const [hasChanges, setHasChanges] = useState(false);
 
   // Load note data
@@ -57,6 +64,7 @@ export function GlobalNoteEditor({
           setNote(noteData);
           setTitle(noteData.title);
           setContent(noteData.content);
+          setFontSize(noteData.fontSize || 16);
           setCitations(citationsData);
         }
       } catch (err: any) {
@@ -101,8 +109,20 @@ export function GlobalNoteEditor({
     }
   }, [noteId, title, content, hasChanges, onUpdate]);
 
-  // Auto-save on blur
-  const handleBlur = useCallback(() => {
+  // Handle font size change
+  const handleFontSizeChange = useCallback(async (newFontSize: number) => {
+    setFontSize(newFontSize);
+    if (onFontSizeUpdate) {
+      try {
+        await onFontSizeUpdate(noteId, newFontSize);
+      } catch (err: any) {
+        console.error('Error saving font size:', err);
+      }
+    }
+  }, [noteId, onFontSizeUpdate]);
+
+  // Auto-save on blur - now handled by RichTextEditor
+  const handleTitleBlur = useCallback(() => {
     if (hasChanges) {
       handleSave();
     }
@@ -161,7 +181,7 @@ export function GlobalNoteEditor({
           <Input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            onBlur={handleBlur}
+            onBlur={handleTitleBlur}
             placeholder="Untitled Note"
             className="text-lg font-semibold border-none p-0 h-auto focus-visible:ring-0"
           />
@@ -193,54 +213,56 @@ export function GlobalNoteEditor({
         </div>
       </div>
 
-      {/* Content */}
-      <ScrollArea className="flex-1 min-h-0">
-        <div className="p-4">
-          <Textarea
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            onBlur={handleBlur}
-            placeholder="Write your thoughts here..."
-            className="min-h-[300px] border-none p-0 resize-none focus-visible:ring-0"
-          />
+      {/* Content - Rich Text Editor */}
+      <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+        <RichTextEditor
+          content={content}
+          fontSize={fontSize}
+          onChange={(html) => {
+            setContent(html);
+          }}
+          onFontSizeChange={handleFontSizeChange}
+          placeholder="Write your thoughts here..."
+        />
+      </div>
 
-          {/* Citations */}
-          {citations.length > 0 && (
-            <div className="mt-6 pt-4 border-t border-border">
-              <h3 className="text-sm font-medium mb-3 flex items-center gap-2">
-                <Link className="h-4 w-4" />
-                Citations ({citations.length})
-              </h3>
-              <div className="space-y-2">
-                {citations.map((citation) => (
-                  <div
-                    key={citation.id}
-                    className="flex items-center justify-between p-2 bg-muted/50 rounded-md group"
+      {/* Citations */}
+      {citations.length > 0 && (
+        <div className="shrink-0 p-4 border-t border-border">
+          <h3 className="text-sm font-medium mb-3 flex items-center gap-2">
+            <Link className="h-4 w-4" />
+            Citations ({citations.length})
+          </h3>
+          <ScrollArea className="max-h-32">
+            <div className="space-y-2">
+              {citations.map((citation) => (
+                <div
+                  key={citation.id}
+                  className="flex items-center justify-between p-2 bg-muted/50 rounded-md group"
+                >
+                  <button
+                    className="flex items-center gap-2 text-sm text-left hover:text-primary transition-colors"
+                    onClick={() => onCitationClick?.(citation.targetDocumentId, citation.targetNodeId || undefined)}
                   >
-                    <button
-                      className="flex items-center gap-2 text-sm text-left hover:text-primary transition-colors"
-                      onClick={() => onCitationClick?.(citation.targetDocumentId, citation.targetNodeId || undefined)}
+                    <ExternalLink className="h-3 w-3 shrink-0" />
+                    <span className="truncate">{citation.citationText}</span>
+                  </button>
+                  {onRemoveCitation && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={() => handleRemoveCitation(citation.id)}
                     >
-                      <ExternalLink className="h-3 w-3 shrink-0" />
-                      <span className="truncate">{citation.citationText}</span>
-                    </button>
-                    {onRemoveCitation && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                        onClick={() => handleRemoveCitation(citation.id)}
-                      >
-                        <X className="h-3 w-3" />
-                      </Button>
-                    )}
-                  </div>
-                ))}
-              </div>
+                      <X className="h-3 w-3" />
+                    </Button>
+                  )}
+                </div>
+              ))}
             </div>
-          )}
+          </ScrollArea>
         </div>
-      </ScrollArea>
+      )}
     </div>
   );
 }

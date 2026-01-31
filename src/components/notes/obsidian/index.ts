@@ -9,3 +9,4 @@ export { NoteTreeItem } from './NoteTreeItem';
 export { CreateDialog } from './CreateDialog';
 export { RenameDialog } from './RenameDialog';
 export { DeleteConfirmDialog } from './DeleteConfirmDialog';
+export { RichTextEditor } from './RichTextEditor';
