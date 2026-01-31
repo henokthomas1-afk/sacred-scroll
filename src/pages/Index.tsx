@@ -1,51 +1,54 @@
 /**
  * Sacred Text Reader - Main Page
  * 
- * A local-first, offline-capable scholarly document reader
- * for religious texts with citation-safe parsing.
+ * Obsidian-style layout with unified sidebar (Library + Notes) on the left
+ * and main content area on the right that supports split view.
  */
 
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { ParsedDocument } from '@/types/document';
-import { DocumentLibrary, SplitScreenReader, DocumentSelector } from '@/components/reader';
-import { NotesPanel, GlobalNotesPanel } from '@/components/notes';
+import { DocumentSelector, SplitScreenReader } from '@/components/reader';
+import { GlobalNoteEditor } from '@/components/notes/obsidian/GlobalNoteEditor';
+import { UnifiedSidebar } from '@/components/layout/UnifiedSidebar';
 import { sampleDocuments } from '@/lib/sampleDocuments';
 import { Button } from '@/components/ui/button';
-import { BookOpen, Menu, Plus, PanelRightOpen, PanelRightClose, Download, Upload, StickyNote, PanelLeftOpen, PanelLeftClose } from 'lucide-react';
+import { 
+  PanelLeftOpen, 
+  PanelLeftClose, 
+  BookOpen, 
+  Plus,
+  SplitSquareHorizontal,
+  X,
+} from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useLocalDocuments } from '@/hooks/useLocalDocuments';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
+import { useGlobalNotes } from '@/hooks/useGlobalNotes';
 import { ImportDocumentModal } from '@/components/import/ImportDocumentModal';
 import { exportToFile, importFromFile } from '@/lib/sync/syncManager';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
-} from '@/components/ui/dropdown-menu';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
-
-type ViewMode = 'reader' | 'notes';
 
 const SIDEBAR_COLLAPSED_KEY = 'sacredScroll.sidebarCollapsed';
 
 export default function Index() {
   const { documents: userDocuments, loading: docsLoading, refreshDocuments } = useLocalDocuments();
+  const {
+    updateNote,
+    updateNoteFontSize,
+    removeCitation,
+  } = useGlobalNotes();
   
   const [selectedDocument, setSelectedDocument] = useState<ParsedDocument | null>(null);
   const [secondaryDocument, setSecondaryDocument] = useState<ParsedDocument | null>(null);
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [notesPanelOpen, setNotesPanelOpen] = useState(false);
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [documentSelectorOpen, setDocumentSelectorOpen] = useState(false);
-  const [viewMode, setViewMode] = useState<ViewMode>('reader');
   const [sidebarCollapsed, setSidebarCollapsed] = useLocalStorage(SIDEBAR_COLLAPSED_KEY, false);
+  const [splitViewEnabled, setSplitViewEnabled] = useState(false);
   
   const isMobile = useIsMobile();
 
@@ -64,11 +67,18 @@ export default function Index() {
   const handleSelectDocument = useCallback((doc: ParsedDocument) => {
     setSelectedDocument(doc);
     setSecondaryDocument(null);
-    setSelectedNodeId(null);
     setSidebarOpen(false);
   }, []);
 
-  const handleOpenSplitView = useCallback(() => {
+  const handleSelectNote = useCallback((noteId: string) => {
+    setSelectedNoteId(noteId || null);
+    // Auto-enable split view when selecting a note
+    if (noteId && selectedDocument) {
+      setSplitViewEnabled(true);
+    }
+  }, [selectedDocument]);
+
+  const handleOpenDocumentSplitView = useCallback(() => {
     setDocumentSelectorOpen(true);
   }, []);
 
@@ -77,6 +87,7 @@ export default function Index() {
   }, []);
 
   const handleCloseSplitView = useCallback(() => {
+    setSplitViewEnabled(false);
     setSecondaryDocument(null);
   }, []);
 
@@ -139,12 +150,13 @@ export default function Index() {
       return;
     }
 
-    // If we have split view, open in secondary
-    if (secondaryDocument) {
-      setSecondaryDocument(targetDoc);
-    } else if (selectedDocument?.metadata.id !== documentId) {
-      // Open in split view
-      setSecondaryDocument(targetDoc);
+    // If different document, open in secondary or switch primary
+    if (selectedDocument?.metadata.id !== documentId) {
+      if (splitViewEnabled) {
+        setSecondaryDocument(targetDoc);
+      } else {
+        setSelectedDocument(targetDoc);
+      }
     }
 
     // Scroll to node after a short delay
@@ -152,94 +164,35 @@ export default function Index() {
       setTimeout(() => {
         const element = document.querySelector(`[data-paragraph-id="${nodeId}"]`);
         element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // Add highlight effect
+        element?.classList.add('citation-highlight');
+        setTimeout(() => element?.classList.remove('citation-highlight'), 2000);
       }, 100);
     }
-  }, [allDocuments, selectedDocument, secondaryDocument]);
+  }, [allDocuments, selectedDocument, splitViewEnabled]);
 
   // Handle navigation to a note (e.g., after creating citation)
   const handleNavigateToNote = useCallback((noteId: string) => {
-    // Switch to notes view mode
-    setViewMode('notes');
-    // Note: The GlobalNotesPanel will need to handle selecting the note
-    // For now, just switching view mode is sufficient
-    toast({ title: 'Note created', description: 'Switched to Notes view' });
+    setSelectedNoteId(noteId);
+    setSplitViewEnabled(true);
+    toast({ title: 'Note created' });
   }, []);
 
-  const handleNodeSelect = useCallback((nodeId: string) => {
-    setSelectedNodeId(nodeId);
-  }, []);
+  const handleUpdateNote = useCallback(async (id: string, updates: Partial<{ title: string; content: string }>) => {
+    await updateNote(id, updates);
+  }, [updateNote]);
 
-  // Header actions component
-  const HeaderActions = () => (
-    <div className="flex items-center gap-2">
-      {/* Sidebar toggle */}
-      {!isMobile && !sidebarCollapsed && (
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setSidebarCollapsed(true)}
-          title="Collapse sidebar"
-        >
-          <PanelLeftClose className="h-5 w-5" />
-        </Button>
-      )}
-      
-      {!isMobile && selectedDocument && (
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setNotesPanelOpen(!notesPanelOpen)}
-          title={notesPanelOpen ? 'Hide notes' : 'Show notes'}
-        >
-          {notesPanelOpen ? (
-            <PanelRightClose className="h-5 w-5" />
-          ) : (
-            <PanelRightOpen className="h-5 w-5" />
-          )}
-        </Button>
-      )}
-
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => setImportModalOpen(true)}
-        className="gap-2"
-      >
-        <Plus className="h-4 w-4" />
-        <span className="hidden sm:inline">Import</span>
-      </Button>
-
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon">
-            <Menu className="h-5 w-5" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem onClick={handleExportLibrary}>
-            <Download className="h-4 w-4 mr-2" />
-            Export Library
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={handleImportLibrary}>
-            <Upload className="h-4 w-4 mr-2" />
-            Import Library
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem disabled className="text-xs text-muted-foreground">
-            {userDocuments.length} documents stored locally
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </div>
-  );
+  const handleUpdateNoteFontSize = useCallback(async (id: string, fontSize: number) => {
+    await updateNoteFontSize(id, fontSize);
+  }, [updateNoteFontSize]);
 
   // Desktop layout with permanent sidebar
   if (!isMobile) {
     return (
-      <div className="flex h-screen bg-background">
+      <div className="flex h-screen bg-background overflow-hidden">
         {/* Collapsed sidebar toggle */}
         {sidebarCollapsed && (
-          <div className="flex-shrink-0 w-12 border-r border-border flex flex-col items-center py-4 gap-2">
+          <div className="flex-shrink-0 w-12 border-r border-border flex flex-col items-center py-4 gap-2 bg-sidebar">
             <Button
               variant="ghost"
               size="icon"
@@ -259,95 +212,117 @@ export default function Index() {
           </div>
         )}
 
-        {/* Sidebar with tabs (when not collapsed) */}
+        {/* Unified Sidebar */}
         <aside 
           className={cn(
-            "flex-shrink-0 border-r border-border flex flex-col transition-all duration-300",
-            sidebarCollapsed ? "w-0 overflow-hidden opacity-0" : "w-72"
+            "flex-shrink-0 border-r border-border flex flex-col transition-all duration-300 overflow-hidden",
+            sidebarCollapsed ? "w-0 opacity-0" : "w-64"
           )}
         >
-          <div className="p-4 border-b border-border flex items-center justify-between">
-            <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as ViewMode)} className="flex-1">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="reader" className="text-xs gap-1">
-                  <BookOpen className="h-3 w-3" />
-                  Library
-                </TabsTrigger>
-                <TabsTrigger value="notes" className="text-xs gap-1">
-                  <StickyNote className="h-3 w-3" />
-                  Notes
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
-            <HeaderActions />
+          {/* Collapse button */}
+          <div className="absolute top-3 left-[232px] z-10">
+            {!sidebarCollapsed && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={() => setSidebarCollapsed(true)}
+                title="Collapse sidebar"
+              >
+                <PanelLeftClose className="h-4 w-4" />
+              </Button>
+            )}
           </div>
           
-          {viewMode === 'reader' ? (
-            <div className="flex-1 overflow-hidden">
-              <DocumentLibrary
-                documents={allDocuments}
-                selectedDocumentId={selectedDocument?.metadata.id || null}
-                onSelectDocument={handleSelectDocument}
-              />
-            </div>
-          ) : (
-            <div className="flex-1 overflow-hidden text-sm text-muted-foreground p-4">
-              <p>Switch to full Notes view →</p>
-            </div>
-          )}
+          <UnifiedSidebar
+            documents={allDocuments}
+            selectedDocumentId={selectedDocument?.metadata.id || null}
+            onSelectDocument={handleSelectDocument}
+            selectedNoteId={selectedNoteId}
+            onSelectNote={handleSelectNote}
+            onImportDocument={() => setImportModalOpen(true)}
+            onExportLibrary={handleExportLibrary}
+            onImportLibrary={handleImportLibrary}
+            className="flex-1"
+          />
         </aside>
 
-        {/* Main Content */}
-        <div className="flex-1 flex min-w-0">
-          {viewMode === 'notes' ? (
-            <GlobalNotesPanel
-              onCitationClick={handleCitationClick}
-              className="flex-1"
-            />
-          ) : notesPanelOpen ? (
-            <ResizablePanelGroup direction="horizontal">
-              <ResizablePanel defaultSize={75} minSize={50}>
-                <main className="h-full">
-                  {selectedDocument ? (
-                    <SplitScreenReader
-                      primaryDocument={selectedDocument}
-                      secondaryDocument={secondaryDocument}
-                      onOpenSecondary={handleOpenSplitView}
-                      onCloseSecondary={handleCloseSplitView}
-                      onNavigateToNode={handleCitationClick}
-                      onNavigateToNote={handleNavigateToNote}
-                    />
-                  ) : (
-                    <EmptyState onImport={() => setImportModalOpen(true)} />
-                  )}
-                </main>
-              </ResizablePanel>
-              <ResizableHandle withHandle />
-              <ResizablePanel defaultSize={25} minSize={20} maxSize={40}>
-                <NotesPanel
-                  documentId={selectedDocument?.metadata.id || null}
-                  documentTitle={selectedDocument?.metadata.title}
-                  selectedNodeId={selectedNodeId}
-                  onCitationClick={handleCitationClick}
-                />
-              </ResizablePanel>
-            </ResizablePanelGroup>
-          ) : (
-            <main className="flex-1 flex flex-col min-w-0">
-              {selectedDocument ? (
-                <SplitScreenReader
-                  primaryDocument={selectedDocument}
-                  secondaryDocument={secondaryDocument}
-                  onOpenSecondary={handleOpenSplitView}
-                  onCloseSecondary={handleCloseSplitView}
-                  onNavigateToNode={handleCitationClick}
-                  onNavigateToNote={handleNavigateToNote}
-                />
-              ) : (
-                <EmptyState onImport={() => setImportModalOpen(true)} />
-              )}
-            </main>
+        {/* Main Content Area */}
+        <div className="flex-1 flex flex-col min-w-0 min-h-0">
+          {/* Content header with split view toggle */}
+          {selectedDocument && (
+            <div className="shrink-0 flex items-center justify-between px-4 py-2 border-b border-border bg-card">
+              <h1 className="font-display font-semibold text-lg truncate">
+                {selectedDocument.metadata.title}
+              </h1>
+              <div className="flex items-center gap-2">
+                {splitViewEnabled ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleCloseSplitView}
+                    className="gap-2"
+                  >
+                    <X className="h-4 w-4" />
+                    <span className="hidden sm:inline">Close Split</span>
+                  </Button>
+                ) : (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setSplitViewEnabled(true)}
+                    className="gap-2"
+                    disabled={!selectedNoteId}
+                    title={selectedNoteId ? "Open split view with note editor" : "Select a note first"}
+                  >
+                    <SplitSquareHorizontal className="h-4 w-4" />
+                    <span className="hidden sm:inline">Split View</span>
+                  </Button>
+                )}
+              </div>
+            </div>
           )}
+
+          {/* Main content */}
+          <div className="flex-1 min-h-0">
+            {!selectedDocument ? (
+              <EmptyState onImport={() => setImportModalOpen(true)} />
+            ) : splitViewEnabled && selectedNoteId ? (
+              <ResizablePanelGroup direction="horizontal" className="h-full">
+                <ResizablePanel defaultSize={60} minSize={30}>
+                  <SplitScreenReader
+                    primaryDocument={selectedDocument}
+                    secondaryDocument={secondaryDocument}
+                    onOpenSecondary={handleOpenDocumentSplitView}
+                    onCloseSecondary={() => setSecondaryDocument(null)}
+                    onNavigateToNode={handleCitationClick}
+                    onNavigateToNote={handleNavigateToNote}
+                  />
+                </ResizablePanel>
+                <ResizableHandle withHandle />
+                <ResizablePanel defaultSize={40} minSize={25}>
+                  <div className="h-full flex flex-col border-l border-border">
+                    <GlobalNoteEditor
+                      noteId={selectedNoteId}
+                      onUpdate={handleUpdateNote}
+                      onFontSizeUpdate={handleUpdateNoteFontSize}
+                      onCitationClick={handleCitationClick}
+                      onRemoveCitation={removeCitation}
+                    />
+                  </div>
+                </ResizablePanel>
+              </ResizablePanelGroup>
+            ) : (
+              <SplitScreenReader
+                primaryDocument={selectedDocument}
+                secondaryDocument={secondaryDocument}
+                onOpenSecondary={handleOpenDocumentSplitView}
+                onCloseSecondary={() => setSecondaryDocument(null)}
+                onNavigateToNode={handleCitationClick}
+                onNavigateToNote={handleNavigateToNote}
+              />
+            )}
+          </div>
         </div>
 
         {/* Modals */}
@@ -370,23 +345,28 @@ export default function Index() {
 
   // Mobile layout with sheet sidebar
   return (
-    <div className="flex flex-col h-screen bg-background">
+    <div className="flex flex-col h-screen bg-background overflow-hidden">
       {/* Mobile Header */}
       <header className="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-border bg-card">
         <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
           <SheetTrigger asChild>
             <Button variant="ghost" size="icon">
-              <Menu className="h-5 w-5" />
+              <PanelLeftOpen className="h-5 w-5" />
             </Button>
           </SheetTrigger>
           <SheetContent side="left" className="p-0 w-72">
-            <div className="p-4 border-b border-border">
-              <h1 className="font-display font-semibold text-lg">Library</h1>
-            </div>
-            <DocumentLibrary
+            <UnifiedSidebar
               documents={allDocuments}
               selectedDocumentId={selectedDocument?.metadata.id || null}
               onSelectDocument={handleSelectDocument}
+              selectedNoteId={selectedNoteId}
+              onSelectNote={handleSelectNote}
+              onImportDocument={() => {
+                setSidebarOpen(false);
+                setImportModalOpen(true);
+              }}
+              onExportLibrary={handleExportLibrary}
+              onImportLibrary={handleImportLibrary}
             />
           </SheetContent>
         </Sheet>
@@ -395,7 +375,13 @@ export default function Index() {
           {selectedDocument?.metadata.title || 'Sacred Text Reader'}
         </h1>
 
-        <HeaderActions />
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setImportModalOpen(true)}
+        >
+          <Plus className="h-5 w-5" />
+        </Button>
       </header>
 
       {/* Main Content */}
@@ -436,7 +422,7 @@ function EmptyState({ onImport }: EmptyStateProps) {
         Select a Document
       </h2>
       <p className="text-muted-foreground max-w-md mb-6">
-        Choose a document from the library to begin reading. 
+        Choose a document from the sidebar to begin reading. 
         Click on paragraphs to select them for citation.
       </p>
       <Button onClick={onImport} className="gap-2">
