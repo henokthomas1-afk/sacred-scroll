@@ -5,8 +5,9 @@
  * with collapsible sections and focus mode support.
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { useGlobalNotes, TreeNode } from '@/hooks/useGlobalNotes';
+import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { NoteTree } from '@/components/notes/obsidian/NoteTree';
 import { CreateDialog } from '@/components/notes/obsidian/CreateDialog';
 import { RenameDialog } from '@/components/notes/obsidian/RenameDialog';
@@ -14,6 +15,7 @@ import { DeleteConfirmDialog } from '@/components/notes/obsidian/DeleteConfirmDi
 import { ParsedDocument } from '@/types/document';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Input } from '@/components/ui/input';
 import { 
   Plus, 
   FolderPlus, 
@@ -23,10 +25,11 @@ import {
   Book,
   ChevronDown,
   ChevronRight,
-  Settings,
+  Menu,
   Upload,
   Download,
-  Menu,
+  X,
+  Check,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
@@ -80,11 +83,17 @@ export function UnifiedSidebar({
     moveItem,
   } = useGlobalNotes();
 
-  // Section collapse states
-  const [libraryOpen, setLibraryOpen] = useState(true);
-  const [notesOpen, setNotesOpen] = useState(true);
+  // Persistent section collapse states
+  const [libraryOpen, setLibraryOpen] = useLocalStorage('sacredScroll.libraryOpen', true);
+  const [notesOpen, setNotesOpen] = useLocalStorage('sacredScroll.notesOpen', true);
   
-  // Dialog states
+  // Inline creation states
+  const [isCreatingNote, setIsCreatingNote] = useState(false);
+  const [isCreatingFolder, setIsCreatingFolder] = useState(false);
+  const [newItemName, setNewItemName] = useState('');
+  const newItemInputRef = useRef<HTMLInputElement>(null);
+  
+  // Dialog states (for nested creation via context menu)
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [createType, setCreateType] = useState<'folder' | 'note'>('note');
   const [createParentId, setCreateParentId] = useState<string | null>(null);
@@ -113,30 +122,89 @@ export function UnifiedSidebar({
     return null;
   }, [tree]);
 
-  // Create handlers
+  // Instant note creation (at root level)
+  const handleInstantCreateNote = useCallback(() => {
+    setIsCreatingNote(true);
+    setNewItemName('Untitled');
+    setTimeout(() => {
+      newItemInputRef.current?.focus();
+      newItemInputRef.current?.select();
+    }, 0);
+  }, []);
+
+  const handleInstantCreateFolder = useCallback(() => {
+    setIsCreatingFolder(true);
+    setNewItemName('New Folder');
+    setTimeout(() => {
+      newItemInputRef.current?.focus();
+      newItemInputRef.current?.select();
+    }, 0);
+  }, []);
+
+  const handleConfirmInlineCreate = async () => {
+    const name = newItemName.trim() || (isCreatingNote ? 'Untitled' : 'New Folder');
+    try {
+      if (isCreatingNote) {
+        const id = await createNote(name, '', null);
+        onSelectNote(id);
+        toast({ title: 'Note created' });
+      } else if (isCreatingFolder) {
+        await createFolder(name, null);
+        toast({ title: 'Folder created' });
+      }
+    } catch (err: any) {
+      toast({
+        title: 'Error',
+        description: err.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setIsCreatingNote(false);
+      setIsCreatingFolder(false);
+      setNewItemName('');
+    }
+  };
+
+  const handleCancelInlineCreate = () => {
+    setIsCreatingNote(false);
+    setIsCreatingFolder(false);
+    setNewItemName('');
+  };
+
+  const handleInlineKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleConfirmInlineCreate();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      handleCancelInlineCreate();
+    }
+  };
+
+  // Create handlers for nested items (via context menu)
   const handleCreateNote = useCallback((parentId: string | null) => {
-    setCreateType('note');
-    setCreateParentId(parentId);
-    if (parentId) {
+    if (parentId === null) {
+      handleInstantCreateNote();
+    } else {
+      setCreateType('note');
+      setCreateParentId(parentId);
       const parent = folders.find(f => f.id === parentId);
       setCreateParentName(parent?.name);
-    } else {
-      setCreateParentName(undefined);
+      setCreateDialogOpen(true);
     }
-    setCreateDialogOpen(true);
-  }, [folders]);
+  }, [folders, handleInstantCreateNote]);
 
   const handleCreateFolder = useCallback((parentId: string | null) => {
-    setCreateType('folder');
-    setCreateParentId(parentId);
-    if (parentId) {
+    if (parentId === null) {
+      handleInstantCreateFolder();
+    } else {
+      setCreateType('folder');
+      setCreateParentId(parentId);
       const parent = folders.find(f => f.id === parentId);
       setCreateParentName(parent?.name);
-    } else {
-      setCreateParentName(undefined);
+      setCreateDialogOpen(true);
     }
-    setCreateDialogOpen(true);
-  }, [folders]);
+  }, [folders, handleInstantCreateFolder]);
 
   const handleCreate = async (name: string) => {
     try {
@@ -359,11 +427,49 @@ export function UnifiedSidebar({
               </DropdownMenu>
             </div>
             <CollapsibleContent>
+              {/* Inline creation input */}
+              {(isCreatingNote || isCreatingFolder) && (
+                <div className="flex items-center gap-1 px-2 py-1 mt-1">
+                  <div className="w-4 flex-shrink-0">
+                    {isCreatingNote ? (
+                      <FileText className="h-3.5 w-3.5 text-muted-foreground" />
+                    ) : (
+                      <FolderPlus className="h-3.5 w-3.5 text-primary" />
+                    )}
+                  </div>
+                  <Input
+                    ref={newItemInputRef}
+                    value={newItemName}
+                    onChange={(e) => setNewItemName(e.target.value)}
+                    onKeyDown={handleInlineKeyDown}
+                    onBlur={handleConfirmInlineCreate}
+                    className="h-6 text-sm px-2 py-0"
+                    placeholder={isCreatingNote ? 'Note name...' : 'Folder name...'}
+                  />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-5 w-5 shrink-0"
+                    onClick={handleConfirmInlineCreate}
+                  >
+                    <Check className="h-3 w-3 text-primary" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-5 w-5 shrink-0"
+                    onClick={handleCancelInlineCreate}
+                  >
+                    <X className="h-3 w-3 text-muted-foreground" />
+                  </Button>
+                </div>
+              )}
+
               {loading ? (
                 <div className="flex items-center justify-center py-4">
                   <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                 </div>
-              ) : tree.length === 0 ? (
+              ) : tree.length === 0 && !isCreatingNote && !isCreatingFolder ? (
                 <div className="px-3 py-4 text-center">
                   <p className="text-xs text-muted-foreground mb-2">No notes yet</p>
                   <Button

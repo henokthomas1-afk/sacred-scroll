@@ -34,6 +34,7 @@ interface NoteTreeItemProps {
   node: TreeNode;
   depth: number;
   isSelected?: boolean;
+  isFocused?: boolean;
   expandedFolders: Set<string>;
   onToggleFolder: (folderId: string) => void;
   onSelectNote: (noteId: string) => void;
@@ -47,6 +48,7 @@ export function NoteTreeItem({
   node,
   depth,
   isSelected,
+  isFocused,
   expandedFolders,
   onToggleFolder,
   onSelectNote,
@@ -101,9 +103,11 @@ export function NoteTreeItem({
         <div
           ref={setNodeRef}
           style={style}
+          data-tree-id={node.id}
           className={cn(
             'group flex items-center gap-1 py-1 px-2 rounded-md cursor-pointer',
             'hover:bg-muted/50 transition-colors',
+            isFocused && 'ring-1 ring-primary/50',
             isDragging && 'opacity-50 bg-muted'
           )}
           onMouseEnter={() => setIsHovered(true)}
@@ -195,6 +199,7 @@ export function NoteTreeItem({
               node={child}
               depth={depth + 1}
               isSelected={isSelected}
+              isFocused={isFocused}
               expandedFolders={expandedFolders}
               onToggleFolder={onToggleFolder}
               onSelectNote={onSelectNote}
@@ -214,10 +219,12 @@ export function NoteTreeItem({
     <div
       ref={setNodeRef}
       style={style}
+      data-tree-id={node.id}
       className={cn(
         'group flex items-center gap-1 py-1 px-2 rounded-md cursor-pointer',
         'hover:bg-muted/50 transition-colors',
         isSelected && 'bg-primary/10 text-primary',
+        isFocused && !isSelected && 'ring-1 ring-primary/50',
         isDragging && 'opacity-50 bg-muted'
       )}
       onClick={handleClick}

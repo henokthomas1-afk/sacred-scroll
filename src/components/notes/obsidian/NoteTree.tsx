@@ -1,8 +1,8 @@
 /**
- * NoteTree - Recursive folder tree with drag & drop
+ * NoteTree - Recursive folder tree with drag & drop and keyboard navigation
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import {
   DndContext,
   DragOverlay,
@@ -59,6 +59,8 @@ export function NoteTree({
   const [activeId, setActiveId] = useState<string | null>(null);
   const [activeNode, setActiveNode] = useState<TreeNode | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
+  const [focusedId, setFocusedId] = useState<string | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -83,11 +85,11 @@ export function NoteTree({
     });
   }, []);
 
-  // Flatten tree for sortable context
-  const flattenTree = (nodes: TreeNode[], parentId: string | null = null): string[] => {
-    const result: string[] = [];
+  // Flatten tree for sortable context and keyboard navigation
+  const flattenTree = (nodes: TreeNode[], parentId: string | null = null): TreeNode[] => {
+    const result: TreeNode[] = [];
     for (const node of nodes) {
-      result.push(node.id);
+      result.push(node);
       if (node.type === 'folder' && node.children && expandedFolders.has(node.id)) {
         result.push(...flattenTree(node.children, node.id));
       }
@@ -95,7 +97,8 @@ export function NoteTree({
     return result;
   };
 
-  const flatIds = flattenTree(tree);
+  const flatNodes = flattenTree(tree);
+  const flatIds = flatNodes.map(n => n.id);
 
   // Find node by id
   const findNode = (id: string, nodes: TreeNode[] = tree): TreeNode | null => {
@@ -190,6 +193,84 @@ export function NoteTree({
     );
   };
 
+  // Keyboard navigation
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (!flatNodes.length) return;
+
+    const currentId = focusedId || selectedNoteId;
+    const currentIndex = currentId ? flatNodes.findIndex(n => n.id === currentId) : -1;
+
+    switch (e.key) {
+      case 'ArrowDown': {
+        e.preventDefault();
+        const nextIndex = currentIndex < flatNodes.length - 1 ? currentIndex + 1 : 0;
+        setFocusedId(flatNodes[nextIndex].id);
+        break;
+      }
+      case 'ArrowUp': {
+        e.preventDefault();
+        const prevIndex = currentIndex > 0 ? currentIndex - 1 : flatNodes.length - 1;
+        setFocusedId(flatNodes[prevIndex].id);
+        break;
+      }
+      case 'ArrowRight': {
+        e.preventDefault();
+        const currentNode = currentId ? findNode(currentId) : null;
+        if (currentNode?.type === 'folder' && !expandedFolders.has(currentNode.id)) {
+          toggleFolder(currentNode.id);
+        }
+        break;
+      }
+      case 'ArrowLeft': {
+        e.preventDefault();
+        const currentNode = currentId ? findNode(currentId) : null;
+        if (currentNode?.type === 'folder' && expandedFolders.has(currentNode.id)) {
+          toggleFolder(currentNode.id);
+        } else if (currentNode?.parentId) {
+          // Move to parent folder
+          setFocusedId(currentNode.parentId);
+        }
+        break;
+      }
+      case 'Enter': {
+        e.preventDefault();
+        const currentNode = currentId ? findNode(currentId) : null;
+        if (currentNode) {
+          if (currentNode.type === 'folder') {
+            toggleFolder(currentNode.id);
+          } else {
+            onSelectNote(currentNode.id);
+          }
+        }
+        break;
+      }
+      case 'F2': {
+        e.preventDefault();
+        const currentNode = currentId ? findNode(currentId) : null;
+        if (currentNode) {
+          onRename(currentNode.id, currentNode.type);
+        }
+        break;
+      }
+      case 'Delete': {
+        e.preventDefault();
+        const currentNode = currentId ? findNode(currentId) : null;
+        if (currentNode) {
+          onDelete(currentNode.id, currentNode.type);
+        }
+        break;
+      }
+    }
+  }, [flatNodes, focusedId, selectedNoteId, expandedFolders, toggleFolder, onSelectNote, onRename, onDelete, findNode]);
+
+  // Focus management
+  useEffect(() => {
+    if (focusedId) {
+      const element = document.querySelector(`[data-tree-id="${focusedId}"]`);
+      element?.scrollIntoView({ block: 'nearest' });
+    }
+  }, [focusedId]);
+
   return (
     <ScrollArea className={cn('flex-1 min-h-0', className)}>
       <DndContext
@@ -200,13 +281,19 @@ export function NoteTree({
         onDragEnd={handleDragEnd}
       >
         <SortableContext items={flatIds} strategy={verticalListSortingStrategy}>
-          <div className="p-2 space-y-0.5">
+          <div 
+            ref={containerRef}
+            className="p-2 space-y-0.5 outline-none"
+            tabIndex={0}
+            onKeyDown={handleKeyDown}
+          >
             {tree.map((node) => (
               <NoteTreeItem
                 key={node.id}
                 node={node}
                 depth={0}
                 isSelected={selectedNoteId === node.id}
+                isFocused={focusedId === node.id}
                 expandedFolders={expandedFolders}
                 onToggleFolder={toggleFolder}
                 onSelectNote={onSelectNote}
