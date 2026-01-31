@@ -194,7 +194,7 @@ export function ImportDocumentModal({ open, onOpenChange, onSuccess }: ImportDoc
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col bg-card overflow-hidden">
+      <DialogContent className="sm:max-w-4xl h-[90vh] flex flex-col bg-card overflow-hidden">
         <DialogHeader>
           <DialogTitle className="font-display text-xl">
             {step === "upload" && "Import Document"}
@@ -539,27 +539,25 @@ function ReviewStep({
         Key fix: min-h-0 is critical for flex children to allow shrinking below content size
         This enables the inner ScrollArea to calculate proper scrollable height
       */}
-      <div className="flex-1 min-h-0 border rounded-md flex flex-col">
-        <ScrollArea className="flex-1">
-          <ImportReviewPanel
-            nodes={review.nodes}
-            stats={review.stats}
-            selectedNodeId={review.selectedNodeId}
-            onSelectNode={review.selectNode}
-            onMakeCenteredTitle={review.makeCenteredTitle}
-            onMakeLeftSubtitle={review.makeLeftSubtitle}
-            onMakeCitable={review.makeCitable}
-            onIgnoreNode={review.ignoreNode}
-            onRestoreNode={review.restoreNode}
-            onMergeWithPrevious={review.mergeWithPrevious}
-            onMergeWithNext={review.mergeWithNext}
-            onSplitNode={review.splitNode}
-            onEditContent={review.editContent}
-            onEditDisplayNumber={review.editDisplayNumber}
-            onResequence={review.resequenceNumbers}
-            onReset={review.resetToInitial}
-          />
-        </ScrollArea>
+      <div className="flex-1 min-h-0 border rounded-md overflow-hidden">
+        <ImportReviewPanel
+          nodes={review.nodes}
+          stats={review.stats}
+          selectedNodeId={review.selectedNodeId}
+          onSelectNode={review.selectNode}
+          onMakeCenteredTitle={review.makeCenteredTitle}
+          onMakeLeftSubtitle={review.makeLeftSubtitle}
+          onMakeCitable={review.makeCitable}
+          onIgnoreNode={review.ignoreNode}
+          onRestoreNode={review.restoreNode}
+          onMergeWithPrevious={review.mergeWithPrevious}
+          onMergeWithNext={review.mergeWithNext}
+          onSplitNode={review.splitNode}
+          onEditContent={review.editContent}
+          onEditDisplayNumber={review.editDisplayNumber}
+          onResequence={review.resequenceNumbers}
+          onReset={review.resetToInitial}
+        />
       </div>
 
       <DialogFooter className="gap-2">
