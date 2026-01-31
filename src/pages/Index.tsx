@@ -156,6 +156,15 @@ export default function Index() {
     }
   }, [allDocuments, selectedDocument, secondaryDocument]);
 
+  // Handle navigation to a note (e.g., after creating citation)
+  const handleNavigateToNote = useCallback((noteId: string) => {
+    // Switch to notes view mode
+    setViewMode('notes');
+    // Note: The GlobalNotesPanel will need to handle selecting the note
+    // For now, just switching view mode is sufficient
+    toast({ title: 'Note created', description: 'Switched to Notes view' });
+  }, []);
+
   const handleNodeSelect = useCallback((nodeId: string) => {
     setSelectedNodeId(nodeId);
   }, []);
@@ -306,6 +315,7 @@ export default function Index() {
                       onOpenSecondary={handleOpenSplitView}
                       onCloseSecondary={handleCloseSplitView}
                       onNavigateToNode={handleCitationClick}
+                      onNavigateToNote={handleNavigateToNote}
                     />
                   ) : (
                     <EmptyState onImport={() => setImportModalOpen(true)} />
@@ -331,6 +341,7 @@ export default function Index() {
                   onOpenSecondary={handleOpenSplitView}
                   onCloseSecondary={handleCloseSplitView}
                   onNavigateToNode={handleCitationClick}
+                  onNavigateToNote={handleNavigateToNote}
                 />
               ) : (
                 <EmptyState onImport={() => setImportModalOpen(true)} />
@@ -394,6 +405,7 @@ export default function Index() {
             primaryDocument={selectedDocument}
             secondaryDocument={null}
             onNavigateToNode={handleCitationClick}
+            onNavigateToNote={handleNavigateToNote}
           />
         ) : (
           <EmptyState onImport={() => setImportModalOpen(true)} />

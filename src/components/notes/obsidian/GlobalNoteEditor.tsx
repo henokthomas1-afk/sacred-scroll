@@ -14,6 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { RichTextEditor } from './RichTextEditor';
+import { CitationAnchorList } from './CitationAnchorList';
 import { 
   Link, 
   ExternalLink, 
@@ -226,7 +227,11 @@ export function GlobalNoteEditor({
         />
       </div>
 
-      {/* Citations */}
+      {/* Citation Anchors (paragraph references) */}
+      <CitationAnchorList
+        noteId={noteId}
+        onNavigate={onCitationClick}
+      />
       {citations.length > 0 && (
         <div className="shrink-0 p-4 border-t border-border">
           <h3 className="text-sm font-medium mb-3 flex items-center gap-2">
