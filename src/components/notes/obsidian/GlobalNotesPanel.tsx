@@ -214,11 +214,11 @@ export function GlobalNotesPanel({
   }
 
   return (
-    <div className={cn('flex flex-col h-full', className)}>
-      <ResizablePanelGroup direction="horizontal" className="flex-1">
+    <div className={cn('flex flex-col h-full min-h-0 overflow-hidden', className)}>
+      <ResizablePanelGroup direction="horizontal" className="flex-1 min-h-0">
         {/* Sidebar with tree */}
         <ResizablePanel defaultSize={35} minSize={25} maxSize={50}>
-          <div className="flex flex-col h-full border-r border-border">
+          <div className="flex flex-col h-full min-h-0 border-r border-border overflow-hidden">
             {/* Header */}
             <div className="shrink-0 p-3 border-b border-border flex items-center justify-between">
               <h2 className="font-display font-semibold flex items-center gap-2">

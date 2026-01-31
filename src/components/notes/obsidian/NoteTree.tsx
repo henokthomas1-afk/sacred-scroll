@@ -191,7 +191,7 @@ export function NoteTree({
   };
 
   return (
-    <ScrollArea className={cn('h-full', className)}>
+    <ScrollArea className={cn('flex-1 min-h-0', className)}>
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}
