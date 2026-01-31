@@ -128,7 +128,7 @@ export function ImportReviewPanel({
   const getNodeIndex = (tempId: string) => nodes.findIndex((n) => n.tempId === tempId);
 
   return (
-    <div className="flex flex-col min-h-0">
+    <div className="flex flex-col flex-1 min-h-0">
       {/* Stats Bar - Fixed header */}
       <div className="shrink-0 flex items-center justify-between p-3 bg-muted/50 border-b">
         <div className="flex flex-wrap gap-3 text-sm">
