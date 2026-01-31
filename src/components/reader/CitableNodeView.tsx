@@ -5,24 +5,30 @@
  * - Render paragraph number + text
  * - Are selectable and highlightable
  * - Support paragraph-based citations
- * - Are the ONLY nodes eligible for citation
+ * - Show citation anchor button on hover
+ * - Display visual indicator if anchored to notes
  */
 
 import { CitableNode } from "@/types/document";
 import { cn } from "@/lib/utils";
+import { Bookmark } from "lucide-react";
 
 interface CitableNodeViewProps {
   node: CitableNode;
   isSelected?: boolean;
   isHighlighted?: boolean;
+  hasAnchor?: boolean;
   onSelect?: (node: CitableNode) => void;
+  renderCitationButton?: () => React.ReactNode;
 }
 
 export function CitableNodeView({ 
   node, 
   isSelected,
   isHighlighted,
-  onSelect 
+  hasAnchor,
+  onSelect,
+  renderCitationButton,
 }: CitableNodeViewProps) {
   const handleClick = () => {
     onSelect?.(node);
@@ -43,21 +49,37 @@ export function CitableNodeView({
       data-paragraph-number={node.number}
     >
       <div className="flex gap-4">
-        {/* Paragraph number */}
-        <span 
-          className={cn(
-            "flex-shrink-0 w-10 text-right font-display font-semibold",
-            "text-muted-foreground group-hover:text-primary transition-colors",
-            isSelected && "text-primary"
+        {/* Paragraph number with anchor indicator */}
+        <div className="flex-shrink-0 w-10 flex items-start justify-end gap-1">
+          {/* Anchor indicator */}
+          {hasAnchor && (
+            <Bookmark 
+              className="h-3 w-3 text-primary fill-primary/30 mt-1.5" 
+              aria-label="Has citations"
+            />
           )}
-        >
-          {node.displayNumber}
-        </span>
+          <span 
+            className={cn(
+              "font-display font-semibold text-right",
+              "text-muted-foreground group-hover:text-primary transition-colors",
+              isSelected && "text-primary"
+            )}
+          >
+            {node.displayNumber}
+          </span>
+        </div>
         
         {/* Paragraph content */}
         <p className="flex-1 font-body text-lg leading-relaxed text-foreground">
           {node.content}
         </p>
+
+        {/* Citation anchor button (rendered via prop) */}
+        {renderCitationButton && (
+          <div className="flex-shrink-0 flex items-start pt-1">
+            {renderCitationButton()}
+          </div>
+        )}
       </div>
       
       {/* Footnotes if present */}

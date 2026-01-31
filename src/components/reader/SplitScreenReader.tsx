@@ -2,7 +2,7 @@
  * SplitScreenReader - Side-by-side document comparison
  * 
  * Supports viewing two documents or two sections of the same document
- * with synchronized highlighting and citation navigation.
+ * with synchronized highlighting, citation navigation, and citation anchors.
  */
 
 import { useState, useCallback } from "react";
@@ -10,11 +10,14 @@ import { ParsedDocument, CitableNode, isStructuralNode, isCitableNode } from "@/
 import { StructuralNodeView } from "./StructuralNodeView";
 import { CitableNodeView } from "./CitableNodeView";
 import { CitationPanel } from "./CitationPanel";
+import { CitationAnchorMenu } from "./CitationAnchorMenu";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { X, Columns2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useCitationAnchors } from "@/hooks/useCitationAnchors";
+import { toast } from "@/hooks/use-toast";
 
 interface SplitScreenReaderProps {
   primaryDocument: ParsedDocument;
@@ -22,6 +25,7 @@ interface SplitScreenReaderProps {
   onCloseSecondary?: () => void;
   onOpenSecondary?: () => void;
   onNavigateToNode?: (documentId: string, nodeId: string) => void;
+  onNavigateToNote?: (noteId: string) => void;
   className?: string;
 }
 
@@ -31,12 +35,17 @@ export function SplitScreenReader({
   onCloseSecondary,
   onOpenSecondary,
   onNavigateToNode,
+  onNavigateToNote,
   className,
 }: SplitScreenReaderProps) {
   const [primarySelectedNodes, setPrimarySelectedNodes] = useState<Set<string>>(new Set());
   const [secondarySelectedNodes, setSecondarySelectedNodes] = useState<Set<string>>(new Set());
   const [showCitationPanel, setShowCitationPanel] = useState(false);
   const [highlightedNodeId, setHighlightedNodeId] = useState<string | null>(null);
+
+  // Citation anchors for primary document
+  const primaryAnchors = useCitationAnchors(primaryDocument.metadata.id);
+  const secondaryAnchors = useCitationAnchors(secondaryDocument?.metadata.id || null);
 
   const handlePrimaryNodeSelect = useCallback((node: CitableNode) => {
     setPrimarySelectedNodes((prev) => {
@@ -80,24 +89,42 @@ export function SplitScreenReader({
       .sort((a, b) => a.number - b.number);
   };
 
+  // Handle adding citation anchor
+  const handleAddToNote = useCallback(async (
+    node: CitableNode,
+    docId: string,
+    docTitle: string,
+    noteId: string,
+    noteTitle: string,
+    anchorsHook: ReturnType<typeof useCitationAnchors>
+  ) => {
+    const displayLabel = `${docTitle} §${node.displayNumber}`;
+    const id = await anchorsHook.addAnchor(node.id, noteId, displayLabel);
+    
+    if (id) {
+      toast({ title: `Cited in "${noteTitle}"` });
+    } else {
+      toast({ 
+        title: 'Already cited', 
+        description: 'This paragraph is already linked to that note.',
+        variant: 'default',
+      });
+    }
+  }, []);
+
   // Navigate to a citation in the split view
   const handleCitationNavigate = useCallback((documentId: string, nodeId: string) => {
-    // If the citation is for the secondary document, highlight there
     if (secondaryDocument && secondaryDocument.metadata.id === documentId) {
       setHighlightedNodeId(nodeId);
-      // Scroll to the node
       const element = document.querySelector(`[data-paragraph-id="${nodeId}"]`);
       element?.scrollIntoView({ behavior: "smooth", block: "center" });
-      
       setTimeout(() => setHighlightedNodeId(null), 2000);
     } else if (primaryDocument.metadata.id === documentId) {
       setHighlightedNodeId(nodeId);
       const element = document.querySelector(`[data-paragraph-id="${nodeId}"]`);
       element?.scrollIntoView({ behavior: "smooth", block: "center" });
-      
       setTimeout(() => setHighlightedNodeId(null), 2000);
     } else {
-      // Document not open, notify parent
       onNavigateToNode?.(documentId, nodeId);
     }
   }, [primaryDocument, secondaryDocument, onNavigateToNode]);
@@ -106,6 +133,7 @@ export function SplitScreenReader({
     doc: ParsedDocument,
     selectedNodes: Set<string>,
     onSelect: (node: CitableNode) => void,
+    anchorsHook: ReturnType<typeof useCitationAnchors>,
     isPrimary: boolean
   ) => (
     <div className="flex flex-col h-full">
@@ -150,7 +178,22 @@ export function SplitScreenReader({
                   node={node}
                   isSelected={selectedNodes.has(node.id)}
                   isHighlighted={highlightedNodeId === node.id}
+                  hasAnchor={anchorsHook.hasAnchor(node.id)}
                   onSelect={onSelect}
+                  renderCitationButton={() => (
+                    <CitationAnchorMenu
+                      node={node}
+                      documentId={doc.metadata.id}
+                      documentTitle={doc.metadata.title}
+                      onAddToNote={(noteId, noteTitle) => 
+                        handleAddToNote(node, doc.metadata.id, doc.metadata.title, noteId, noteTitle, anchorsHook)
+                      }
+                      onCreateNote={(noteId, noteTitle) => {
+                        handleAddToNote(node, doc.metadata.id, doc.metadata.title, noteId, noteTitle, anchorsHook);
+                        onNavigateToNote?.(noteId);
+                      }}
+                    />
+                  )}
                 />
               );
             }
@@ -206,7 +249,22 @@ export function SplitScreenReader({
                     node={node}
                     isSelected={primarySelectedNodes.has(node.id)}
                     isHighlighted={highlightedNodeId === node.id}
+                    hasAnchor={primaryAnchors.hasAnchor(node.id)}
                     onSelect={handlePrimaryNodeSelect}
+                    renderCitationButton={() => (
+                      <CitationAnchorMenu
+                        node={node}
+                        documentId={primaryDocument.metadata.id}
+                        documentTitle={primaryDocument.metadata.title}
+                        onAddToNote={(noteId, noteTitle) => 
+                          handleAddToNote(node, primaryDocument.metadata.id, primaryDocument.metadata.title, noteId, noteTitle, primaryAnchors)
+                        }
+                        onCreateNote={(noteId, noteTitle) => {
+                          handleAddToNote(node, primaryDocument.metadata.id, primaryDocument.metadata.title, noteId, noteTitle, primaryAnchors);
+                          onNavigateToNote?.(noteId);
+                        }}
+                      />
+                    )}
                   />
                 );
               }
@@ -237,6 +295,7 @@ export function SplitScreenReader({
             primaryDocument,
             primarySelectedNodes,
             handlePrimaryNodeSelect,
+            primaryAnchors,
             true
           )}
         </ResizablePanel>
@@ -248,6 +307,7 @@ export function SplitScreenReader({
             secondaryDocument,
             secondarySelectedNodes,
             handleSecondaryNodeSelect,
+            secondaryAnchors,
             false
           )}
         </ResizablePanel>
