@@ -408,17 +408,24 @@ export function UnifiedSidebar({
                   <span className="ml-auto text-xs opacity-60">{notes.length}</span>
                 </Button>
               </CollapsibleTrigger>
+              {/* Direct + button for instant note creation */}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 mr-1 hover:bg-sidebar-accent"
+                onClick={handleInstantCreateNote}
+                title="New Note"
+              >
+                <Plus className="h-3.5 w-3.5" />
+              </Button>
+              {/* Dropdown for folder creation */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-6 w-6 mr-1">
-                    <Plus className="h-3 w-3" />
+                  <Button variant="ghost" size="icon" className="h-6 w-6 mr-1 hover:bg-sidebar-accent">
+                    <FolderPlus className="h-3.5 w-3.5" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => handleCreateNote(null)}>
-                    <FileText className="h-4 w-4 mr-2" />
-                    New Note
-                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => handleCreateFolder(null)}>
                     <FolderPlus className="h-4 w-4 mr-2" />
                     New Folder
@@ -469,31 +476,39 @@ export function UnifiedSidebar({
                 <div className="flex items-center justify-center py-4">
                   <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                 </div>
-              ) : tree.length === 0 && !isCreatingNote && !isCreatingFolder ? (
-                <div className="px-3 py-4 text-center">
-                  <p className="text-xs text-muted-foreground mb-2">No notes yet</p>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="text-xs h-7"
-                    onClick={() => handleCreateNote(null)}
-                  >
-                    <Plus className="h-3 w-3 mr-1" />
-                    Create note
-                  </Button>
-                </div>
               ) : (
-                <NoteTree
-                  tree={tree}
-                  selectedNoteId={selectedNoteId}
-                  onSelectNote={onSelectNote}
-                  onMoveItem={moveItem}
-                  onRename={handleRename}
-                  onDelete={handleDelete}
-                  onCreateNote={handleCreateNote}
-                  onCreateFolder={handleCreateFolder}
-                  className="mt-1"
-                />
+                <>
+                  {/* Always visible "+ New Note" row */}
+                  {!isCreatingNote && !isCreatingFolder && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="w-full justify-start h-7 px-3 text-sm font-normal text-muted-foreground hover:text-foreground hover:bg-sidebar-accent mt-1"
+                      onClick={handleInstantCreateNote}
+                    >
+                      <Plus className="h-3.5 w-3.5 mr-2" />
+                      New Note
+                    </Button>
+                  )}
+                  
+                  {tree.length === 0 && !isCreatingNote && !isCreatingFolder ? (
+                    <div className="px-3 py-2 text-center">
+                      <p className="text-xs text-muted-foreground">No notes yet</p>
+                    </div>
+                  ) : (
+                    <NoteTree
+                      tree={tree}
+                      selectedNoteId={selectedNoteId}
+                      onSelectNote={onSelectNote}
+                      onMoveItem={moveItem}
+                      onRename={handleRename}
+                      onDelete={handleDelete}
+                      onCreateNote={handleCreateNote}
+                      onCreateFolder={handleCreateFolder}
+                      className="mt-0.5"
+                    />
+                  )}
+                </>
               )}
             </CollapsibleContent>
           </Collapsible>
