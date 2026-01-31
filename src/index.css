@@ -157,6 +157,16 @@
   /* Selection highlight for citations */
   .citation-highlight {
     @apply bg-accent/30 rounded-sm px-0.5 -mx-0.5;
+    animation: citation-pulse 2s ease-out;
+  }
+
+  @keyframes citation-pulse {
+    0%, 20% {
+      background-color: hsl(var(--accent) / 0.5);
+    }
+    100% {
+      background-color: hsl(var(--accent) / 0);
+    }
   }
 
   /* Parchment texture effect */
