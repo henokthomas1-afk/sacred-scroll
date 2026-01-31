@@ -5,16 +5,17 @@
  * for religious texts with citation-safe parsing.
  */
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { ParsedDocument } from '@/types/document';
 import { DocumentLibrary, SplitScreenReader, DocumentSelector } from '@/components/reader';
 import { NotesPanel, GlobalNotesPanel } from '@/components/notes';
 import { sampleDocuments } from '@/lib/sampleDocuments';
 import { Button } from '@/components/ui/button';
-import { BookOpen, Menu, Plus, PanelRightOpen, PanelRightClose, Download, Upload, StickyNote } from 'lucide-react';
+import { BookOpen, Menu, Plus, PanelRightOpen, PanelRightClose, Download, Upload, StickyNote, PanelLeftOpen, PanelLeftClose } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useLocalDocuments } from '@/hooks/useLocalDocuments';
+import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { ImportDocumentModal } from '@/components/import/ImportDocumentModal';
 import { exportToFile, importFromFile } from '@/lib/sync/syncManager';
 import {
@@ -27,8 +28,11 @@ import {
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 
 type ViewMode = 'reader' | 'notes';
+
+const SIDEBAR_COLLAPSED_KEY = 'sacredScroll.sidebarCollapsed';
 
 export default function Index() {
   const { documents: userDocuments, loading: docsLoading, refreshDocuments } = useLocalDocuments();
@@ -41,6 +45,7 @@ export default function Index() {
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [documentSelectorOpen, setDocumentSelectorOpen] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('reader');
+  const [sidebarCollapsed, setSidebarCollapsed] = useLocalStorage(SIDEBAR_COLLAPSED_KEY, false);
   
   const isMobile = useIsMobile();
 
@@ -158,6 +163,18 @@ export default function Index() {
   // Header actions component
   const HeaderActions = () => (
     <div className="flex items-center gap-2">
+      {/* Sidebar toggle */}
+      {!isMobile && !sidebarCollapsed && (
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setSidebarCollapsed(true)}
+          title="Collapse sidebar"
+        >
+          <PanelLeftClose className="h-5 w-5" />
+        </Button>
+      )}
+      
       {!isMobile && selectedDocument && (
         <Button
           variant="ghost"
@@ -211,8 +228,35 @@ export default function Index() {
   if (!isMobile) {
     return (
       <div className="flex h-screen bg-background">
-        {/* Sidebar with tabs */}
-        <aside className="w-72 flex-shrink-0 border-r border-border flex flex-col">
+        {/* Collapsed sidebar toggle */}
+        {sidebarCollapsed && (
+          <div className="flex-shrink-0 w-12 border-r border-border flex flex-col items-center py-4 gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setSidebarCollapsed(false)}
+              title="Expand sidebar"
+            >
+              <PanelLeftOpen className="h-5 w-5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setImportModalOpen(true)}
+              title="Import document"
+            >
+              <Plus className="h-5 w-5" />
+            </Button>
+          </div>
+        )}
+
+        {/* Sidebar with tabs (when not collapsed) */}
+        <aside 
+          className={cn(
+            "flex-shrink-0 border-r border-border flex flex-col transition-all duration-300",
+            sidebarCollapsed ? "w-0 overflow-hidden opacity-0" : "w-72"
+          )}
+        >
           <div className="p-4 border-b border-border flex items-center justify-between">
             <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as ViewMode)} className="flex-1">
               <TabsList className="grid w-full grid-cols-2">

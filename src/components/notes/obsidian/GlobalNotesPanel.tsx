@@ -46,6 +46,7 @@ export function GlobalNotesPanel({
     deleteFolder,
     createNote,
     updateNote,
+    updateNoteFontSize,
     deleteNote,
     moveItem,
     removeCitation,
@@ -205,6 +206,10 @@ export function GlobalNotesPanel({
     await updateNote(id, updates);
   };
 
+  const handleUpdateNoteFontSize = async (id: string, fontSize: number) => {
+    await updateNoteFontSize(id, fontSize);
+  };
+
   if (loading) {
     return (
       <div className={cn('flex items-center justify-center h-full', className)}>
@@ -283,6 +288,7 @@ export function GlobalNotesPanel({
             <GlobalNoteEditor
               noteId={selectedNoteId}
               onUpdate={handleUpdateNote}
+              onFontSizeUpdate={handleUpdateNoteFontSize}
               onCitationClick={onCitationClick}
               onRemoveCitation={removeCitation}
             />
