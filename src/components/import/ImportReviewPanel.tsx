@@ -160,7 +160,7 @@ export function ImportReviewPanel({
       </div>
 
       {/* Node List - Scrollable content area */}
-      <ScrollArea className="flex-1 min-h-0 h-full">
+      <ScrollArea className="flex-1 min-h-0">
         <div className="p-2 space-y-1">
           {nodes.map((node, index) => (
             <ReviewNodeItem

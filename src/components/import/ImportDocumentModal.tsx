@@ -259,18 +259,20 @@ export function ImportDocumentModal({ open, onOpenChange, onSuccess }: ImportDoc
         )}
 
         {step === "review" && (
-          <ReviewStep
-            initialParsedNodes={initialParsedNodes}
-            title={title}
-            author={author}
-            category={category}
-            sourceType={sourceType}
-            rawText={rawText}
-            onBack={() => setStep("configure")}
-            onClose={handleClose}
-            onSuccess={onSuccess}
-            saveDocument={saveDocument}
-          />
+          <div className="flex-1 min-h-0">
+            <ReviewStep
+              initialParsedNodes={initialParsedNodes}
+              title={title}
+              author={author}
+              category={category}
+              sourceType={sourceType}
+              rawText={rawText}
+              onBack={() => setStep("configure")}
+              onClose={handleClose}
+              onSuccess={onSuccess}
+              saveDocument={saveDocument}
+            />
+          </div>
         )}
       </DialogContent>
     </Dialog>
