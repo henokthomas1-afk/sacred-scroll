@@ -7,8 +7,11 @@
 
 import { useState, useCallback, useRef } from 'react';
 import { useGlobalNotes, TreeNode } from '@/hooks/useGlobalNotes';
+import { useDocumentFolders, DocTreeNode } from '@/hooks/useDocumentFolders';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { NoteTree } from '@/components/notes/obsidian/NoteTree';
+import { DocumentTree } from '@/components/layout/DocumentTree';
+import { NewItemMenu } from '@/components/layout/NewItemMenu';
 import { CreateDialog } from '@/components/notes/obsidian/CreateDialog';
 import { RenameDialog } from '@/components/notes/obsidian/RenameDialog';
 import { DeleteConfirmDialog } from '@/components/notes/obsidian/DeleteConfirmDialog';
@@ -17,7 +20,6 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { 
-  Plus, 
   FolderPlus, 
   FileText, 
   Loader2,
@@ -70,86 +72,117 @@ export function UnifiedSidebar({
   className,
 }: UnifiedSidebarProps) {
   const {
-    folders,
+    folders: noteFolders,
     notes,
-    tree,
-    loading,
-    createFolder,
-    renameFolder,
-    deleteFolder,
+    tree: noteTree,
+    loading: notesLoading,
+    createFolder: createNoteFolder,
+    renameFolder: renameNoteFolder,
+    deleteFolder: deleteNoteFolder,
     createNote,
     updateNote,
     deleteNote,
-    moveItem,
+    moveItem: moveNoteItem,
   } = useGlobalNotes();
+
+  const {
+    folders: docFolders,
+    tree: docTree,
+    loading: docsLoading,
+    createFolder: createDocFolder,
+    renameFolder: renameDocFolder,
+    deleteFolder: deleteDocFolder,
+    moveItem: moveDocItem,
+  } = useDocumentFolders(documents);
 
   // Persistent section collapse states
   const [libraryOpen, setLibraryOpen] = useLocalStorage('sacredScroll.libraryOpen', true);
   const [notesOpen, setNotesOpen] = useLocalStorage('sacredScroll.notesOpen', true);
   
-  // Inline creation states
+  // Inline creation states for Notes
   const [isCreatingNote, setIsCreatingNote] = useState(false);
-  const [isCreatingFolder, setIsCreatingFolder] = useState(false);
-  const [newItemName, setNewItemName] = useState('');
-  const newItemInputRef = useRef<HTMLInputElement>(null);
+  const [isCreatingNoteFolder, setIsCreatingNoteFolder] = useState(false);
+  const [newNoteItemName, setNewNoteItemName] = useState('');
+  const newNoteInputRef = useRef<HTMLInputElement>(null);
+
+  // Inline creation states for Documents
+  const [isCreatingDocFolder, setIsCreatingDocFolder] = useState(false);
+  const [newDocFolderName, setNewDocFolderName] = useState('');
+  const newDocInputRef = useRef<HTMLInputElement>(null);
   
   // Dialog states (for nested creation via context menu)
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [createType, setCreateType] = useState<'folder' | 'note'>('note');
+  const [createContext, setCreateContext] = useState<'notes' | 'documents'>('notes');
   const [createParentId, setCreateParentId] = useState<string | null>(null);
   const [createParentName, setCreateParentName] = useState<string | undefined>();
 
   const [renameDialogOpen, setRenameDialogOpen] = useState(false);
   const [renameId, setRenameId] = useState<string>('');
-  const [renameType, setRenameType] = useState<'folder' | 'note'>('note');
+  const [renameType, setRenameType] = useState<'folder' | 'note' | 'document'>('note');
+  const [renameContext, setRenameContext] = useState<'notes' | 'documents'>('notes');
   const [renameName, setRenameName] = useState('');
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string>('');
   const [deleteType, setDeleteType] = useState<'folder' | 'note'>('note');
+  const [deleteContext, setDeleteContext] = useState<'notes' | 'documents'>('notes');
   const [deleteName, setDeleteName] = useState('');
   const [deleteHasChildren, setDeleteHasChildren] = useState(false);
 
-  // Find node helper
-  const findNode = useCallback((id: string, nodes: TreeNode[] = tree): TreeNode | null => {
+  // Find node helper for notes
+  const findNoteNode = useCallback((id: string, nodes: TreeNode[] = noteTree): TreeNode | null => {
     for (const node of nodes) {
       if (node.id === id) return node;
       if (node.children) {
-        const found = findNode(id, node.children);
+        const found = findNoteNode(id, node.children);
         if (found) return found;
       }
     }
     return null;
-  }, [tree]);
+  }, [noteTree]);
 
-  // Instant note creation (at root level)
+  // Find node helper for documents
+  const findDocNode = useCallback((id: string, nodes: DocTreeNode[] = docTree): DocTreeNode | null => {
+    for (const node of nodes) {
+      if (node.id === id) return node;
+      if (node.children) {
+        const found = findDocNode(id, node.children);
+        if (found) return found;
+      }
+    }
+    return null;
+  }, [docTree]);
+
+  // ============= Notes Inline Creation =============
+
   const handleInstantCreateNote = useCallback(() => {
     setIsCreatingNote(true);
-    setNewItemName('Untitled');
+    setNewNoteItemName('Untitled');
     setTimeout(() => {
-      newItemInputRef.current?.focus();
-      newItemInputRef.current?.select();
+      newNoteInputRef.current?.focus();
+      newNoteInputRef.current?.select();
     }, 0);
   }, []);
 
-  const handleInstantCreateFolder = useCallback(() => {
-    setIsCreatingFolder(true);
-    setNewItemName('New Folder');
+  const handleInstantCreateNoteFolder = useCallback(() => {
+    setIsCreatingNoteFolder(true);
+    setNewNoteItemName('New Folder');
     setTimeout(() => {
-      newItemInputRef.current?.focus();
-      newItemInputRef.current?.select();
+      newNoteInputRef.current?.focus();
+      newNoteInputRef.current?.select();
     }, 0);
   }, []);
 
-  const handleConfirmInlineCreate = async () => {
-    const name = newItemName.trim() || (isCreatingNote ? 'Untitled' : 'New Folder');
+  const handleConfirmNoteInlineCreate = async () => {
+    const name = newNoteItemName.trim() || (isCreatingNote ? 'Untitled' : 'New Folder');
     try {
       if (isCreatingNote) {
         const id = await createNote(name, '', null);
         onSelectNote(id);
         toast({ title: 'Note created' });
-      } else if (isCreatingFolder) {
-        await createFolder(name, null);
+      } else if (isCreatingNoteFolder) {
+        await createNoteFolder(name, null);
         toast({ title: 'Folder created' });
       }
     } catch (err: any) {
@@ -160,61 +193,125 @@ export function UnifiedSidebar({
       });
     } finally {
       setIsCreatingNote(false);
-      setIsCreatingFolder(false);
-      setNewItemName('');
+      setIsCreatingNoteFolder(false);
+      setNewNoteItemName('');
     }
   };
 
-  const handleCancelInlineCreate = () => {
+  const handleCancelNoteInlineCreate = () => {
     setIsCreatingNote(false);
-    setIsCreatingFolder(false);
-    setNewItemName('');
+    setIsCreatingNoteFolder(false);
+    setNewNoteItemName('');
   };
 
-  const handleInlineKeyDown = (e: React.KeyboardEvent) => {
+  const handleNoteInlineKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       e.preventDefault();
-      handleConfirmInlineCreate();
+      handleConfirmNoteInlineCreate();
     } else if (e.key === 'Escape') {
       e.preventDefault();
-      handleCancelInlineCreate();
+      handleCancelNoteInlineCreate();
     }
   };
 
-  // Create handlers for nested items (via context menu)
-  const handleCreateNote = useCallback((parentId: string | null) => {
+  // ============= Documents Inline Creation =============
+
+  const handleInstantCreateDocFolder = useCallback(() => {
+    setIsCreatingDocFolder(true);
+    setNewDocFolderName('New Folder');
+    setTimeout(() => {
+      newDocInputRef.current?.focus();
+      newDocInputRef.current?.select();
+    }, 0);
+  }, []);
+
+  const handleConfirmDocInlineCreate = async () => {
+    const name = newDocFolderName.trim() || 'New Folder';
+    try {
+      await createDocFolder(name, null);
+      toast({ title: 'Folder created' });
+    } catch (err: any) {
+      toast({
+        title: 'Error',
+        description: err.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setIsCreatingDocFolder(false);
+      setNewDocFolderName('');
+    }
+  };
+
+  const handleCancelDocInlineCreate = () => {
+    setIsCreatingDocFolder(false);
+    setNewDocFolderName('');
+  };
+
+  const handleDocInlineKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleConfirmDocInlineCreate();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      handleCancelDocInlineCreate();
+    }
+  };
+
+  // ============= Create handlers for nested items (via context menu) =============
+
+  const handleCreateNoteInFolder = useCallback((parentId: string | null) => {
     if (parentId === null) {
       handleInstantCreateNote();
     } else {
+      setCreateContext('notes');
       setCreateType('note');
       setCreateParentId(parentId);
-      const parent = folders.find(f => f.id === parentId);
+      const parent = noteFolders.find(f => f.id === parentId);
       setCreateParentName(parent?.name);
       setCreateDialogOpen(true);
     }
-  }, [folders, handleInstantCreateNote]);
+  }, [noteFolders, handleInstantCreateNote]);
 
-  const handleCreateFolder = useCallback((parentId: string | null) => {
+  const handleCreateNoteFolderInFolder = useCallback((parentId: string | null) => {
     if (parentId === null) {
-      handleInstantCreateFolder();
+      handleInstantCreateNoteFolder();
     } else {
+      setCreateContext('notes');
       setCreateType('folder');
       setCreateParentId(parentId);
-      const parent = folders.find(f => f.id === parentId);
+      const parent = noteFolders.find(f => f.id === parentId);
       setCreateParentName(parent?.name);
       setCreateDialogOpen(true);
     }
-  }, [folders, handleInstantCreateFolder]);
+  }, [noteFolders, handleInstantCreateNoteFolder]);
+
+  const handleCreateDocFolderInFolder = useCallback((parentId: string | null) => {
+    if (parentId === null) {
+      handleInstantCreateDocFolder();
+    } else {
+      setCreateContext('documents');
+      setCreateType('folder');
+      setCreateParentId(parentId);
+      const parent = docFolders.find(f => f.id === parentId);
+      setCreateParentName(parent?.name);
+      setCreateDialogOpen(true);
+    }
+  }, [docFolders, handleInstantCreateDocFolder]);
 
   const handleCreate = async (name: string) => {
     try {
-      if (createType === 'folder') {
-        await createFolder(name, createParentId);
-        toast({ title: 'Folder created' });
+      if (createContext === 'notes') {
+        if (createType === 'folder') {
+          await createNoteFolder(name, createParentId);
+          toast({ title: 'Folder created' });
+        } else {
+          const id = await createNote(name, '', createParentId);
+          onSelectNote(id);
+          toast({ title: 'Note created' });
+        }
       } else {
-        const id = await createNote(name, '', createParentId);
-        onSelectNote(id);
-        toast({ title: 'Note created' });
+        await createDocFolder(name, createParentId);
+        toast({ title: 'Folder created' });
       }
     } catch (err: any) {
       toast({
@@ -225,13 +322,15 @@ export function UnifiedSidebar({
     }
   };
 
-  // Rename handlers
-  const handleRename = useCallback((id: string, type: 'folder' | 'note') => {
+  // ============= Rename handlers =============
+
+  const handleRenameNote = useCallback((id: string, type: 'folder' | 'note') => {
     setRenameId(id);
     setRenameType(type);
+    setRenameContext('notes');
     
     if (type === 'folder') {
-      const folder = folders.find(f => f.id === id);
+      const folder = noteFolders.find(f => f.id === id);
       setRenameName(folder?.name || '');
     } else {
       const note = notes.find(n => n.id === id);
@@ -239,14 +338,38 @@ export function UnifiedSidebar({
     }
     
     setRenameDialogOpen(true);
-  }, [folders, notes]);
+  }, [noteFolders, notes]);
+
+  const handleRenameDoc = useCallback((id: string, type: 'folder' | 'document') => {
+    setRenameId(id);
+    setRenameType(type);
+    setRenameContext('documents');
+    
+    if (type === 'folder') {
+      const folder = docFolders.find(f => f.id === id);
+      setRenameName(folder?.name || '');
+    } else {
+      // Documents have titles from metadata, renaming would need different logic
+      const doc = documents.find(d => d.metadata.id === id);
+      setRenameName(doc?.metadata.title || '');
+    }
+    
+    setRenameDialogOpen(true);
+  }, [docFolders, documents]);
 
   const handleRenameSubmit = async (newName: string) => {
     try {
-      if (renameType === 'folder') {
-        await renameFolder(renameId, newName);
+      if (renameContext === 'notes') {
+        if (renameType === 'folder') {
+          await renameNoteFolder(renameId, newName);
+        } else {
+          await updateNote(renameId, { title: newName });
+        }
       } else {
-        await updateNote(renameId, { title: newName });
+        if (renameType === 'folder') {
+          await renameDocFolder(renameId, newName);
+        }
+        // Document renaming would require updating the document title in db.ts
       }
       toast({ title: 'Renamed successfully' });
     } catch (err: any) {
@@ -258,15 +381,17 @@ export function UnifiedSidebar({
     }
   };
 
-  // Delete handlers
-  const handleDelete = useCallback((id: string, type: 'folder' | 'note') => {
+  // ============= Delete handlers =============
+
+  const handleDeleteNote = useCallback((id: string, type: 'folder' | 'note') => {
     setDeleteId(id);
     setDeleteType(type);
+    setDeleteContext('notes');
     
     if (type === 'folder') {
-      const folder = folders.find(f => f.id === id);
+      const folder = noteFolders.find(f => f.id === id);
       setDeleteName(folder?.name || '');
-      const node = findNode(id);
+      const node = findNoteNode(id);
       setDeleteHasChildren(!!node?.children?.length);
     } else {
       const note = notes.find(n => n.id === id);
@@ -275,19 +400,37 @@ export function UnifiedSidebar({
     }
     
     setDeleteDialogOpen(true);
-  }, [folders, notes, findNode]);
+  }, [noteFolders, notes, findNoteNode]);
+
+  const handleDeleteDoc = useCallback((id: string, type: 'folder') => {
+    setDeleteId(id);
+    setDeleteType(type);
+    setDeleteContext('documents');
+    
+    const folder = docFolders.find(f => f.id === id);
+    setDeleteName(folder?.name || '');
+    const node = findDocNode(id);
+    setDeleteHasChildren(!!node?.children?.length);
+    
+    setDeleteDialogOpen(true);
+  }, [docFolders, findDocNode]);
 
   const handleDeleteConfirm = async () => {
     try {
-      if (deleteType === 'folder') {
-        await deleteFolder(deleteId);
-        toast({ title: 'Folder deleted' });
-      } else {
-        await deleteNote(deleteId);
-        if (selectedNoteId === deleteId) {
-          onSelectNote('');
+      if (deleteContext === 'notes') {
+        if (deleteType === 'folder') {
+          await deleteNoteFolder(deleteId);
+          toast({ title: 'Folder deleted' });
+        } else {
+          await deleteNote(deleteId);
+          if (selectedNoteId === deleteId) {
+            onSelectNote('');
+          }
+          toast({ title: 'Note deleted' });
         }
-        toast({ title: 'Note deleted' });
+      } else {
+        await deleteDocFolder(deleteId);
+        toast({ title: 'Folder deleted' });
       }
     } catch (err: any) {
       toast({
@@ -296,10 +439,6 @@ export function UnifiedSidebar({
         variant: 'destructive',
       });
     }
-  };
-
-  const getDocumentIcon = (sourceType: ParsedDocument["metadata"]["sourceType"]) => {
-    return Book;
   };
 
   return (
@@ -315,7 +454,7 @@ export function UnifiedSidebar({
             onClick={onImportDocument}
             title="Import document"
           >
-            <Plus className="h-4 w-4" />
+            <Upload className="h-4 w-4" />
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -344,7 +483,7 @@ export function UnifiedSidebar({
       {/* Scrollable content */}
       <ScrollArea className="flex-1">
         <div className="p-2 space-y-1">
-          {/* Library Section */}
+          {/* Library/Documents Section */}
           <Collapsible open={libraryOpen} onOpenChange={setLibraryOpen}>
             <CollapsibleTrigger asChild>
               <Button
@@ -363,79 +502,84 @@ export function UnifiedSidebar({
               </Button>
             </CollapsibleTrigger>
             <CollapsibleContent>
-              <div className="space-y-0.5 mt-1">
-                {documents.map((doc) => {
-                  const isSelected = doc.metadata.id === selectedDocumentId;
-                  return (
-                    <Button
-                      key={doc.metadata.id}
-                      variant="ghost"
-                      size="sm"
-                      className={cn(
-                        "w-full justify-start h-8 px-3 text-sm font-normal",
-                        isSelected && "bg-sidebar-accent text-sidebar-accent-foreground"
-                      )}
-                      onClick={() => onSelectDocument(doc)}
-                    >
-                      <FileText className="h-3.5 w-3.5 mr-2 flex-shrink-0 text-muted-foreground" />
-                      <span className="truncate">{doc.metadata.title}</span>
-                    </Button>
-                  );
-                })}
-              </div>
+              {/* Inline folder creation input */}
+              {isCreatingDocFolder && (
+                <div className="flex items-center gap-1 px-2 py-1 mt-1">
+                  <div className="w-4 flex-shrink-0">
+                    <FolderPlus className="h-3.5 w-3.5 text-primary" />
+                  </div>
+                  <Input
+                    ref={newDocInputRef}
+                    value={newDocFolderName}
+                    onChange={(e) => setNewDocFolderName(e.target.value)}
+                    onKeyDown={handleDocInlineKeyDown}
+                    onBlur={handleConfirmDocInlineCreate}
+                    className="h-6 text-sm px-2 py-0"
+                    placeholder="Folder name..."
+                  />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-5 w-5 shrink-0"
+                    onClick={handleConfirmDocInlineCreate}
+                  >
+                    <Check className="h-3 w-3 text-primary" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-5 w-5 shrink-0"
+                    onClick={handleCancelDocInlineCreate}
+                  >
+                    <X className="h-3 w-3 text-muted-foreground" />
+                  </Button>
+                </div>
+              )}
+
+              {docsLoading ? (
+                <div className="flex items-center justify-center py-4">
+                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                </div>
+              ) : (
+                <DocumentTree
+                  tree={docTree}
+                  documents={documents}
+                  selectedDocumentId={selectedDocumentId}
+                  onSelectDocument={onSelectDocument}
+                  onMoveItem={moveDocItem}
+                  onRename={handleRenameDoc}
+                  onDelete={handleDeleteDoc}
+                  onCreateFolder={handleCreateDocFolderInFolder}
+                  className="mt-1"
+                />
+              )}
             </CollapsibleContent>
           </Collapsible>
 
           {/* Divider */}
           <div className="h-px bg-sidebar-border my-2" />
 
-          {/* Notes Section */}
+          {/* Notes Section - header is static, no action buttons */}
           <Collapsible open={notesOpen} onOpenChange={setNotesOpen}>
-            <div className="flex items-center">
-              <CollapsibleTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="flex-1 justify-start gap-2 h-8 px-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground"
-                >
-                  {notesOpen ? (
-                    <ChevronDown className="h-3 w-3" />
-                  ) : (
-                    <ChevronRight className="h-3 w-3" />
-                  )}
-                  <StickyNote className="h-3 w-3" />
-                  Notes
-                  <span className="ml-auto text-xs opacity-60">{notes.length}</span>
-                </Button>
-              </CollapsibleTrigger>
-              {/* Direct + button for instant note creation */}
+            <CollapsibleTrigger asChild>
               <Button
                 variant="ghost"
-                size="icon"
-                className="h-6 w-6 mr-1 hover:bg-sidebar-accent"
-                onClick={handleInstantCreateNote}
-                title="New Note"
+                size="sm"
+                className="w-full justify-start gap-2 h-8 px-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground"
               >
-                <Plus className="h-3.5 w-3.5" />
+                {notesOpen ? (
+                  <ChevronDown className="h-3 w-3" />
+                ) : (
+                  <ChevronRight className="h-3 w-3" />
+                )}
+                <StickyNote className="h-3 w-3" />
+                Notes
+                <span className="ml-auto text-xs opacity-60">{notes.length}</span>
               </Button>
-              {/* Dropdown for folder creation */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-6 w-6 mr-1 hover:bg-sidebar-accent">
-                    <FolderPlus className="h-3.5 w-3.5" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => handleCreateFolder(null)}>
-                    <FolderPlus className="h-4 w-4 mr-2" />
-                    New Folder
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
+            </CollapsibleTrigger>
             <CollapsibleContent>
               {/* Inline creation input */}
-              {(isCreatingNote || isCreatingFolder) && (
+              {(isCreatingNote || isCreatingNoteFolder) && (
                 <div className="flex items-center gap-1 px-2 py-1 mt-1">
                   <div className="w-4 flex-shrink-0">
                     {isCreatingNote ? (
@@ -445,11 +589,11 @@ export function UnifiedSidebar({
                     )}
                   </div>
                   <Input
-                    ref={newItemInputRef}
-                    value={newItemName}
-                    onChange={(e) => setNewItemName(e.target.value)}
-                    onKeyDown={handleInlineKeyDown}
-                    onBlur={handleConfirmInlineCreate}
+                    ref={newNoteInputRef}
+                    value={newNoteItemName}
+                    onChange={(e) => setNewNoteItemName(e.target.value)}
+                    onKeyDown={handleNoteInlineKeyDown}
+                    onBlur={handleConfirmNoteInlineCreate}
                     className="h-6 text-sm px-2 py-0"
                     placeholder={isCreatingNote ? 'Note name...' : 'Folder name...'}
                   />
@@ -457,7 +601,7 @@ export function UnifiedSidebar({
                     variant="ghost"
                     size="icon"
                     className="h-5 w-5 shrink-0"
-                    onClick={handleConfirmInlineCreate}
+                    onClick={handleConfirmNoteInlineCreate}
                   >
                     <Check className="h-3 w-3 text-primary" />
                   </Button>
@@ -465,46 +609,42 @@ export function UnifiedSidebar({
                     variant="ghost"
                     size="icon"
                     className="h-5 w-5 shrink-0"
-                    onClick={handleCancelInlineCreate}
+                    onClick={handleCancelNoteInlineCreate}
                   >
                     <X className="h-3 w-3 text-muted-foreground" />
                   </Button>
                 </div>
               )}
 
-              {loading ? (
+              {notesLoading ? (
                 <div className="flex items-center justify-center py-4">
                   <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                 </div>
               ) : (
                 <>
-                  {/* Always visible "+ New Note" row */}
-                  {!isCreatingNote && !isCreatingFolder && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="w-full justify-start h-7 px-3 text-sm font-normal text-muted-foreground hover:text-foreground hover:bg-sidebar-accent mt-1"
-                      onClick={handleInstantCreateNote}
-                    >
-                      <Plus className="h-3.5 w-3.5 mr-2" />
-                      New Note
-                    </Button>
+                  {/* Single "+ New..." entry point */}
+                  {!isCreatingNote && !isCreatingNoteFolder && (
+                    <NewItemMenu
+                      onCreateNote={handleInstantCreateNote}
+                      onCreateFolder={handleInstantCreateNoteFolder}
+                      className="mt-1"
+                    />
                   )}
                   
-                  {tree.length === 0 && !isCreatingNote && !isCreatingFolder ? (
+                  {noteTree.length === 0 && !isCreatingNote && !isCreatingNoteFolder ? (
                     <div className="px-3 py-2 text-center">
                       <p className="text-xs text-muted-foreground">No notes yet</p>
                     </div>
                   ) : (
                     <NoteTree
-                      tree={tree}
+                      tree={noteTree}
                       selectedNoteId={selectedNoteId}
                       onSelectNote={onSelectNote}
-                      onMoveItem={moveItem}
-                      onRename={handleRename}
-                      onDelete={handleDelete}
-                      onCreateNote={handleCreateNote}
-                      onCreateFolder={handleCreateFolder}
+                      onMoveItem={moveNoteItem}
+                      onRename={handleRenameNote}
+                      onDelete={handleDeleteNote}
+                      onCreateNote={handleCreateNoteInFolder}
+                      onCreateFolder={handleCreateNoteFolderInFolder}
                       className="mt-0.5"
                     />
                   )}
@@ -527,7 +667,7 @@ export function UnifiedSidebar({
       <RenameDialog
         open={renameDialogOpen}
         onOpenChange={setRenameDialogOpen}
-        itemType={renameType}
+        itemType={renameType === 'document' ? 'note' : renameType}
         currentName={renameName}
         onRename={handleRenameSubmit}
       />
