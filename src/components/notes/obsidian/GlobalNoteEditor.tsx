@@ -154,7 +154,7 @@ export function GlobalNoteEditor({
   }
 
   return (
-    <div className={cn('flex flex-col h-full', className)}>
+    <div className={cn('flex flex-col h-full min-h-0 overflow-hidden', className)}>
       {/* Header */}
       <div className="shrink-0 p-4 border-b border-border space-y-2">
         <div className="flex items-center gap-2">
@@ -194,7 +194,7 @@ export function GlobalNoteEditor({
       </div>
 
       {/* Content */}
-      <ScrollArea className="flex-1">
+      <ScrollArea className="flex-1 min-h-0">
         <div className="p-4">
           <Textarea
             value={content}
