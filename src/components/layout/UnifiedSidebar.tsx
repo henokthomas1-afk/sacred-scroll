@@ -12,6 +12,7 @@ import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { NoteTree } from '@/components/notes/obsidian/NoteTree';
 import { DocumentTree } from '@/components/layout/DocumentTree';
 import { NewItemMenu } from '@/components/layout/NewItemMenu';
+import { LibraryItemMenu } from '@/components/layout/LibraryItemMenu';
 import { CreateDialog } from '@/components/notes/obsidian/CreateDialog';
 import { RenameDialog } from '@/components/notes/obsidian/RenameDialog';
 import { DeleteConfirmDialog } from '@/components/notes/obsidian/DeleteConfirmDialog';
@@ -541,17 +542,34 @@ export function UnifiedSidebar({
                   <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                 </div>
               ) : (
-                <DocumentTree
-                  tree={docTree}
-                  documents={documents}
-                  selectedDocumentId={selectedDocumentId}
-                  onSelectDocument={onSelectDocument}
-                  onMoveItem={moveDocItem}
-                  onRename={handleRenameDoc}
-                  onDelete={handleDeleteDoc}
-                  onCreateFolder={handleCreateDocFolderInFolder}
-                  className="mt-1"
-                />
+                <>
+                  {/* Single "+ New..." entry point for Documents */}
+                  {!isCreatingDocFolder && (
+                    <LibraryItemMenu
+                      onCreateFolder={handleInstantCreateDocFolder}
+                      onImportDocument={onImportDocument}
+                      className="mt-1"
+                    />
+                  )}
+                  
+                  {docTree.length === 0 && !isCreatingDocFolder ? (
+                    <div className="px-3 py-2 text-center">
+                      <p className="text-xs text-muted-foreground">No documents yet</p>
+                    </div>
+                  ) : (
+                    <DocumentTree
+                      tree={docTree}
+                      documents={documents}
+                      selectedDocumentId={selectedDocumentId}
+                      onSelectDocument={onSelectDocument}
+                      onMoveItem={moveDocItem}
+                      onRename={handleRenameDoc}
+                      onDelete={handleDeleteDoc}
+                      onCreateFolder={handleCreateDocFolderInFolder}
+                      className="mt-0.5"
+                    />
+                  )}
+                </>
               )}
             </CollapsibleContent>
           </Collapsible>

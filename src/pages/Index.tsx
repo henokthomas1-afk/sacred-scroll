@@ -3,6 +3,7 @@
  * 
  * Obsidian-style layout with unified sidebar (Library + Notes) on the left
  * and main content area on the right that supports split view.
+ * Shows Home screen when no content is active.
  */
 
 import { useState, useMemo, useCallback } from 'react';
@@ -10,6 +11,7 @@ import { ParsedDocument } from '@/types/document';
 import { DocumentSelector, SplitScreenReader } from '@/components/reader';
 import { GlobalNoteEditor } from '@/components/notes/obsidian/GlobalNoteEditor';
 import { UnifiedSidebar } from '@/components/layout/UnifiedSidebar';
+import { HomeScreen } from '@/components/layout/HomeScreen';
 import { sampleDocuments } from '@/lib/sampleDocuments';
 import { Button } from '@/components/ui/button';
 import { 
@@ -36,6 +38,8 @@ const SIDEBAR_COLLAPSED_KEY = 'sacredScroll.sidebarCollapsed';
 export default function Index() {
   const { documents: userDocuments, loading: docsLoading, refreshDocuments } = useLocalDocuments();
   const {
+    notes,
+    createNote,
     updateNote,
     updateNoteFontSize,
     removeCitation,
@@ -57,12 +61,8 @@ export default function Index() {
     return [...userDocuments, ...sampleDocuments];
   }, [userDocuments]);
 
-  // Set initial document
-  useMemo(() => {
-    if (!selectedDocument && allDocuments.length > 0) {
-      setSelectedDocument(allDocuments[0]);
-    }
-  }, [allDocuments, selectedDocument]);
+  // Do NOT auto-select a document - start with Home screen
+  // (Removed the previous useMemo that auto-selected first document)
 
   const handleSelectDocument = useCallback((doc: ParsedDocument) => {
     setSelectedDocument(doc);
@@ -77,6 +77,39 @@ export default function Index() {
       setSplitViewEnabled(true);
     }
   }, [selectedDocument]);
+
+  // Home screen action handlers
+  const handleHomeOpenLibrary = useCallback(() => {
+    // Focus the library section - just expand sidebar if collapsed
+    setSidebarCollapsed(false);
+  }, [setSidebarCollapsed]);
+
+  const handleHomeCreateNote = useCallback(async () => {
+    try {
+      const id = await createNote('Untitled', '', null);
+      setSelectedNoteId(id);
+      setSplitViewEnabled(true);
+      toast({ title: 'Note created' });
+    } catch (err: any) {
+      toast({
+        title: 'Error creating note',
+        description: err.message,
+        variant: 'destructive',
+      });
+    }
+  }, [createNote]);
+
+  const handleHomeSelectDocument = useCallback((docId: string) => {
+    const doc = allDocuments.find(d => d.metadata.id === docId);
+    if (doc) {
+      setSelectedDocument(doc);
+    }
+  }, [allDocuments]);
+
+  const handleHomeSelectNote = useCallback((noteId: string) => {
+    setSelectedNoteId(noteId);
+    setSplitViewEnabled(true);
+  }, []);
 
   const handleOpenDocumentSplitView = useCallback(() => {
     setDocumentSelectorOpen(true);
@@ -286,7 +319,15 @@ export default function Index() {
           {/* Main content */}
           <div className="flex-1 min-h-0">
             {!selectedDocument ? (
-              <EmptyState onImport={() => setImportModalOpen(true)} />
+              <HomeScreen
+                onOpenLibrary={handleHomeOpenLibrary}
+                onImportDocument={() => setImportModalOpen(true)}
+                onCreateNote={handleHomeCreateNote}
+                recentDocuments={allDocuments.slice(0, 5).map(d => ({ id: d.metadata.id, title: d.metadata.title }))}
+                recentNotes={notes.slice(0, 5).map(n => ({ id: n.id, title: n.title }))}
+                onSelectDocument={handleHomeSelectDocument}
+                onSelectNote={handleHomeSelectNote}
+              />
             ) : splitViewEnabled && selectedNoteId ? (
               <ResizablePanelGroup direction="horizontal" className="h-full">
                 <ResizablePanel defaultSize={60} minSize={30}>
@@ -394,7 +435,15 @@ export default function Index() {
             onNavigateToNote={handleNavigateToNote}
           />
         ) : (
-          <EmptyState onImport={() => setImportModalOpen(true)} />
+          <HomeScreen
+            onOpenLibrary={() => setSidebarOpen(true)}
+            onImportDocument={() => setImportModalOpen(true)}
+            onCreateNote={handleHomeCreateNote}
+            recentDocuments={allDocuments.slice(0, 3).map(d => ({ id: d.metadata.id, title: d.metadata.title }))}
+            recentNotes={notes.slice(0, 3).map(n => ({ id: n.id, title: n.title }))}
+            onSelectDocument={handleHomeSelectDocument}
+            onSelectNote={handleHomeSelectNote}
+          />
         )}
       </main>
 
@@ -408,27 +457,4 @@ export default function Index() {
   );
 }
 
-interface EmptyStateProps {
-  onImport: () => void;
-}
-
-function EmptyState({ onImport }: EmptyStateProps) {
-  return (
-    <div className="flex flex-col items-center justify-center h-full p-8 text-center">
-      <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-        <BookOpen className="h-8 w-8 text-primary" />
-      </div>
-      <h2 className="font-display text-xl font-semibold text-foreground mb-2">
-        Select a Document
-      </h2>
-      <p className="text-muted-foreground max-w-md mb-6">
-        Choose a document from the sidebar to begin reading. 
-        Click on paragraphs to select them for citation.
-      </p>
-      <Button onClick={onImport} className="gap-2">
-        <Plus className="h-4 w-4" />
-        Import Document
-      </Button>
-    </div>
-  );
-}
+// EmptyState removed - replaced by HomeScreen

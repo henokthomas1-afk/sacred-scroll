@@ -3,3 +3,8 @@ export { ReaderPane } from './ReaderPane';
 export { SimpleNotesPane } from './SimpleNotesPane';
 export { UnifiedSidebar } from './UnifiedSidebar';
 export { MainContentArea } from './MainContentArea';
+export { HomeScreen } from './HomeScreen';
+export { NewItemMenu } from './NewItemMenu';
+export { LibraryItemMenu } from './LibraryItemMenu';
+export { DocumentTree } from './DocumentTree';
+export { DocumentTreeItem } from './DocumentTreeItem';
