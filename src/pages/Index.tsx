@@ -4,11 +4,14 @@
  * Obsidian-style layout with unified sidebar (Library + Notes) on the left
  * and main content area on the right that supports split view.
  * Shows Home screen when no content is active.
+ * Includes first-class Bible reader integration.
  */
 
 import { useState, useMemo, useCallback } from 'react';
 import { ParsedDocument } from '@/types/document';
+import { BibleNavigationState, parseBibleCitationId, isBibleCitationId } from '@/types/bible';
 import { DocumentSelector, SplitScreenReader } from '@/components/reader';
+import { BibleReader } from '@/components/bible';
 import { GlobalNoteEditor } from '@/components/notes/obsidian/GlobalNoteEditor';
 import { UnifiedSidebar } from '@/components/layout/UnifiedSidebar';
 import { HomeScreen } from '@/components/layout/HomeScreen';
@@ -54,6 +57,10 @@ export default function Index() {
   const [sidebarCollapsed, setSidebarCollapsed] = useLocalStorage(SIDEBAR_COLLAPSED_KEY, false);
   const [splitViewEnabled, setSplitViewEnabled] = useState(false);
   
+  // Bible state
+  const [showBible, setShowBible] = useState(false);
+  const [bibleNavigation, setBibleNavigation] = useState<BibleNavigationState | undefined>();
+  
   const isMobile = useIsMobile();
 
   // Combine user documents with sample documents
@@ -67,16 +74,40 @@ export default function Index() {
   const handleSelectDocument = useCallback((doc: ParsedDocument) => {
     setSelectedDocument(doc);
     setSecondaryDocument(null);
+    setShowBible(false); // Close Bible when selecting a document
     setSidebarOpen(false);
   }, []);
 
   const handleSelectNote = useCallback((noteId: string) => {
     setSelectedNoteId(noteId || null);
     // Auto-enable split view when selecting a note
-    if (noteId && selectedDocument) {
+    if (noteId && (selectedDocument || showBible)) {
       setSplitViewEnabled(true);
     }
-  }, [selectedDocument]);
+  }, [selectedDocument, showBible]);
+
+  // Bible handlers
+  const handleOpenBible = useCallback(() => {
+    setShowBible(true);
+    setSelectedDocument(null);
+    setSecondaryDocument(null);
+    setBibleNavigation(undefined);
+  }, []);
+
+  const handleCloseBible = useCallback(() => {
+    setShowBible(false);
+    setBibleNavigation(undefined);
+  }, []);
+
+  const handleBibleCiteVerse = useCallback((verseId: string, verseText: string) => {
+    // This would integrate with the notes system to insert a citation
+    toast({
+      title: 'Verse cited',
+      description: `${verseText} - Citation saved to clipboard`,
+    });
+    // Copy to clipboard for easy pasting
+    navigator.clipboard.writeText(`[[${verseId}|${verseText}]]`);
+  }, []);
 
   // Home screen action handlers
   const handleHomeOpenLibrary = useCallback(() => {
@@ -171,8 +202,26 @@ export default function Index() {
   }, [refreshDocuments]);
 
   // Handle citation navigation - find document and scroll to node
-  const handleCitationClick = useCallback((documentId: string, nodeId?: string) => {
-    const targetDoc = allDocuments.find((d) => d.metadata.id === documentId);
+  // Also handles Bible citations (bible:translation:book:chapter:verse)
+  const handleCitationClick = useCallback((citationId: string, nodeId?: string) => {
+    // Check if this is a Bible citation
+    if (isBibleCitationId(citationId)) {
+      const bibleCitation = parseBibleCitationId(citationId);
+      if (bibleCitation) {
+        setBibleNavigation({
+          translation: bibleCitation.translation,
+          book: bibleCitation.book,
+          chapter: bibleCitation.chapter,
+          verse: bibleCitation.verse,
+        });
+        setShowBible(true);
+        setSelectedDocument(null);
+        return;
+      }
+    }
+
+    // Regular document citation
+    const targetDoc = allDocuments.find((d) => d.metadata.id === citationId);
     
     if (!targetDoc) {
       toast({
@@ -183,8 +232,11 @@ export default function Index() {
       return;
     }
 
+    // Close Bible if navigating to a document
+    setShowBible(false);
+
     // If different document, open in secondary or switch primary
-    if (selectedDocument?.metadata.id !== documentId) {
+    if (selectedDocument?.metadata.id !== citationId) {
       if (splitViewEnabled) {
         setSecondaryDocument(targetDoc);
       } else {
@@ -276,6 +328,8 @@ export default function Index() {
             onImportDocument={() => setImportModalOpen(true)}
             onExportLibrary={handleExportLibrary}
             onImportLibrary={handleImportLibrary}
+            onOpenBible={handleOpenBible}
+            isBibleActive={showBible}
             className="flex-1"
           />
         </aside>
@@ -283,10 +337,10 @@ export default function Index() {
         {/* Main Content Area */}
         <div className="flex-1 flex flex-col min-w-0 min-h-0">
           {/* Content header with split view toggle */}
-          {selectedDocument && (
+          {(selectedDocument || showBible) && (
             <div className="shrink-0 flex items-center justify-between px-4 py-2 border-b border-border bg-card">
               <h1 className="font-display font-semibold text-lg truncate">
-                {selectedDocument.metadata.title}
+                {showBible ? 'Bible' : selectedDocument?.metadata.title}
               </h1>
               <div className="flex items-center gap-2">
                 {splitViewEnabled ? (
@@ -318,7 +372,8 @@ export default function Index() {
 
           {/* Main content */}
           <div className="flex-1 min-h-0">
-            {!selectedDocument ? (
+            {/* Home screen - no content active */}
+            {!selectedDocument && !showBible ? (
               <HomeScreen
                 onOpenLibrary={handleHomeOpenLibrary}
                 onImportDocument={() => setImportModalOpen(true)}
@@ -328,11 +383,43 @@ export default function Index() {
                 onSelectDocument={handleHomeSelectDocument}
                 onSelectNote={handleHomeSelectNote}
               />
+            ) : showBible ? (
+              /* Bible reader view */
+              splitViewEnabled && selectedNoteId ? (
+                <ResizablePanelGroup direction="horizontal" className="h-full">
+                  <ResizablePanel defaultSize={60} minSize={30}>
+                    <BibleReader
+                      initialNavigation={bibleNavigation}
+                      onCiteVerse={handleBibleCiteVerse}
+                      onClose={handleCloseBible}
+                    />
+                  </ResizablePanel>
+                  <ResizableHandle withHandle />
+                  <ResizablePanel defaultSize={40} minSize={25}>
+                    <div className="h-full flex flex-col border-l border-border">
+                      <GlobalNoteEditor
+                        noteId={selectedNoteId}
+                        onUpdate={handleUpdateNote}
+                        onFontSizeUpdate={handleUpdateNoteFontSize}
+                        onCitationClick={handleCitationClick}
+                        onRemoveCitation={removeCitation}
+                      />
+                    </div>
+                  </ResizablePanel>
+                </ResizablePanelGroup>
+              ) : (
+                <BibleReader
+                  initialNavigation={bibleNavigation}
+                  onCiteVerse={handleBibleCiteVerse}
+                  onClose={handleCloseBible}
+                />
+              )
             ) : splitViewEnabled && selectedNoteId ? (
+              /* Document reader with split note editor */
               <ResizablePanelGroup direction="horizontal" className="h-full">
                 <ResizablePanel defaultSize={60} minSize={30}>
                   <SplitScreenReader
-                    primaryDocument={selectedDocument}
+                    primaryDocument={selectedDocument!}
                     secondaryDocument={secondaryDocument}
                     onOpenSecondary={handleOpenDocumentSplitView}
                     onCloseSecondary={() => setSecondaryDocument(null)}
@@ -354,8 +441,9 @@ export default function Index() {
                 </ResizablePanel>
               </ResizablePanelGroup>
             ) : (
+              /* Document reader only */
               <SplitScreenReader
-                primaryDocument={selectedDocument}
+                primaryDocument={selectedDocument!}
                 secondaryDocument={secondaryDocument}
                 onOpenSecondary={handleOpenDocumentSplitView}
                 onCloseSecondary={() => setSecondaryDocument(null)}
@@ -408,12 +496,17 @@ export default function Index() {
               }}
               onExportLibrary={handleExportLibrary}
               onImportLibrary={handleImportLibrary}
+              onOpenBible={() => {
+                setSidebarOpen(false);
+                handleOpenBible();
+              }}
+              isBibleActive={showBible}
             />
           </SheetContent>
         </Sheet>
 
         <h1 className="font-display font-semibold text-lg truncate flex-1 text-center">
-          {selectedDocument?.metadata.title || 'Sacred Text Reader'}
+          {showBible ? 'Bible' : selectedDocument?.metadata.title || 'Sacred Text Reader'}
         </h1>
 
         <Button
@@ -427,7 +520,13 @@ export default function Index() {
 
       {/* Main Content */}
       <main className="flex-1 min-h-0">
-        {selectedDocument ? (
+        {showBible ? (
+          <BibleReader
+            initialNavigation={bibleNavigation}
+            onCiteVerse={handleBibleCiteVerse}
+            onClose={handleCloseBible}
+          />
+        ) : selectedDocument ? (
           <SplitScreenReader
             primaryDocument={selectedDocument}
             secondaryDocument={null}

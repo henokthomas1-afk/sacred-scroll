@@ -26,6 +26,7 @@ import {
   Loader2,
   StickyNote,
   Book,
+  BookOpen,
   ChevronDown,
   ChevronRight,
   Menu,
@@ -58,6 +59,8 @@ interface UnifiedSidebarProps {
   onImportDocument: () => void;
   onExportLibrary: () => void;
   onImportLibrary: () => void;
+  onOpenBible?: () => void;
+  isBibleActive?: boolean;
   className?: string;
 }
 
@@ -70,6 +73,8 @@ export function UnifiedSidebar({
   onImportDocument,
   onExportLibrary,
   onImportLibrary,
+  onOpenBible,
+  isBibleActive = false,
   className,
 }: UnifiedSidebarProps) {
   const {
@@ -480,6 +485,24 @@ export function UnifiedSidebar({
           </DropdownMenu>
         </div>
       </div>
+
+      {/* Bible button - prominent top-level entry */}
+      {onOpenBible && (
+        <div className="shrink-0 px-2 py-2 border-b border-sidebar-border">
+          <Button
+            variant={isBibleActive ? "secondary" : "ghost"}
+            size="sm"
+            className={cn(
+              "w-full justify-start gap-2 h-9",
+              isBibleActive && "bg-primary/10 text-primary"
+            )}
+            onClick={onOpenBible}
+          >
+            <BookOpen className="h-4 w-4" />
+            <span className="font-medium">Bible</span>
+          </Button>
+        </div>
+      )}
 
       {/* Scrollable content */}
       <ScrollArea className="flex-1">
