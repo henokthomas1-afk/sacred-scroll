@@ -64,6 +64,7 @@ interface UnifiedSidebarProps {
   onImportLibrary: () => void;
   onOpenBible?: () => void;
   onDeleteDocument?: (docId: string) => Promise<boolean>;
+  onRenameDocument?: (docId: string, newName: string) => Promise<void>;
   isBibleActive?: boolean;
   className?: string;
 }
@@ -80,6 +81,7 @@ export function UnifiedSidebar({
   onImportLibrary,
   onOpenBible,
   onDeleteDocument,
+  onRenameDocument,
   isBibleActive = false,
   className,
 }: UnifiedSidebarProps) {
@@ -382,8 +384,12 @@ export function UnifiedSidebar({
       } else {
         if (renameType === 'folder') {
           await renameDocFolder(renameId, newName);
+        } else {
+          // Rename document using callback to ensure refresh happens
+          if (onRenameDocument) {
+            await onRenameDocument(renameId, newName);
+          }
         }
-        // Document renaming would require updating the document title in db.ts
       }
       toast({ title: 'Renamed successfully' });
     } catch (err: any) {
@@ -739,7 +745,7 @@ export function UnifiedSidebar({
       <RenameDialog
         open={renameDialogOpen}
         onOpenChange={setRenameDialogOpen}
-        itemType={renameType === 'document' ? 'note' : renameType}
+        itemType={renameType}
         currentName={renameName}
         onRename={handleRenameSubmit}
       />

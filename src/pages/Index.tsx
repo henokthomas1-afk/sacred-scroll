@@ -198,6 +198,13 @@ export default function Index() {
     }
   }, [selectedDocument, secondaryDocument, refreshDocuments]);
 
+  // Rename document handler
+  const handleRenameDocument = useCallback(async (docId: string, newName: string): Promise<void> => {
+    const { renameDocument } = await import('@/lib/db');
+    await renameDocument(docId, newName);
+    refreshDocuments();
+  }, [refreshDocuments]);
+
   const handleExportLibrary = useCallback(async () => {
     try {
       await exportToFile();
@@ -370,6 +377,7 @@ export default function Index() {
             onImportLibrary={handleImportLibrary}
             onOpenBible={handleOpenBible}
             onDeleteDocument={handleDeleteDocument}
+            onRenameDocument={handleRenameDocument}
             isBibleActive={showBible}
             className="flex-1"
           />
@@ -562,6 +570,7 @@ export default function Index() {
                 handleOpenBible();
               }}
               onDeleteDocument={handleDeleteDocument}
+              onRenameDocument={handleRenameDocument}
               isBibleActive={showBible}
             />
           </SheetContent>

@@ -19,7 +19,7 @@ import { Loader2 } from 'lucide-react';
 interface RenameDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  itemType: 'folder' | 'note';
+  itemType: 'folder' | 'note' | 'document';
   currentName: string;
   onRename: (newName: string) => Promise<void>;
 }
@@ -59,7 +59,7 @@ export function RenameDialog({
         <form onSubmit={handleSubmit}>
           <DialogHeader>
             <DialogTitle>
-              Rename {itemType === 'folder' ? 'Folder' : 'Note'}
+              Rename {itemType === 'folder' ? 'Folder' : itemType === 'document' ? 'Document' : 'Note'}
             </DialogTitle>
             <DialogDescription>
               Enter a new name for this {itemType}.
@@ -74,7 +74,7 @@ export function RenameDialog({
               id="name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder={itemType === 'folder' ? 'Folder name' : 'Note title'}
+              placeholder={itemType === 'folder' ? 'Folder name' : itemType === 'document' ? 'Document title' : 'Note title'}
               autoFocus
             />
           </div>
