@@ -63,6 +63,7 @@ interface UnifiedSidebarProps {
   onExportLibrary: () => void;
   onImportLibrary: () => void;
   onOpenBible?: () => void;
+  onDeleteDocument?: (docId: string) => Promise<boolean>;
   isBibleActive?: boolean;
   className?: string;
 }
@@ -78,6 +79,7 @@ export function UnifiedSidebar({
   onExportLibrary,
   onImportLibrary,
   onOpenBible,
+  onDeleteDocument,
   isBibleActive = false,
   className,
 }: UnifiedSidebarProps) {
@@ -414,18 +416,23 @@ export function UnifiedSidebar({
     setDeleteDialogOpen(true);
   }, [noteFolders, notes, findNoteNode]);
 
-  const handleDeleteDoc = useCallback((id: string, type: 'folder') => {
+  const handleDeleteDoc = useCallback((id: string, type: 'folder' | 'document') => {
+    if (type === 'folder') {
+      const folder = docFolders.find(f => f.id === id);
+      setDeleteName(folder?.name || '');
+      const node = findDocNode(id);
+      setDeleteHasChildren(!!node?.children?.length);
+    } else {
+      const doc = documents.find(d => d.metadata.id === id);
+      setDeleteName(doc?.metadata.title || '');
+      setDeleteHasChildren(false);
+    }
+    
     setDeleteId(id);
-    setDeleteType(type);
+    setDeleteType(type === 'folder' ? 'folder' : 'note'); // note type for documents
     setDeleteContext('documents');
-    
-    const folder = docFolders.find(f => f.id === id);
-    setDeleteName(folder?.name || '');
-    const node = findDocNode(id);
-    setDeleteHasChildren(!!node?.children?.length);
-    
     setDeleteDialogOpen(true);
-  }, [docFolders, findDocNode]);
+  }, [docFolders, documents, findDocNode]);
 
   const handleDeleteConfirm = async () => {
     try {
@@ -441,8 +448,19 @@ export function UnifiedSidebar({
           toast({ title: 'Note deleted' });
         }
       } else {
-        await deleteDocFolder(deleteId);
-        toast({ title: 'Folder deleted' });
+        // Documents context
+        if (deleteType === 'folder') {
+          await deleteDocFolder(deleteId);
+          toast({ title: 'Folder deleted' });
+        } else {
+          // Document deletion
+          if (onDeleteDocument) {
+            const success = await onDeleteDocument(deleteId);
+            if (success) {
+              toast({ title: 'Document deleted' });
+            }
+          }
+        }
       }
     } catch (err: any) {
       toast({
