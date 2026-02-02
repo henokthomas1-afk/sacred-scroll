@@ -35,6 +35,7 @@ import {
   Download,
   X,
   Check,
+  Settings,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
@@ -57,6 +58,7 @@ interface UnifiedSidebarProps {
   onSelectDocument: (doc: ParsedDocument) => void;
   selectedNoteId: string | null;
   onSelectNote: (noteId: string) => void;
+  onOpenSettings: () => void;
   onImportDocument: () => void;
   onExportLibrary: () => void;
   onImportLibrary: () => void;
@@ -71,6 +73,7 @@ export function UnifiedSidebar({
   onSelectDocument,
   selectedNoteId,
   onSelectNote,
+  onOpenSettings,
   onImportDocument,
   onExportLibrary,
   onImportLibrary,
@@ -466,10 +469,10 @@ export function UnifiedSidebar({
             variant="ghost"
             size="icon"
             className="h-7 w-7"
-            onClick={onImportDocument}
-            title="Import document"
+            onClick={onOpenSettings}
+            title="Settings"
           >
-            <Upload className="h-4 w-4" />
+            <Settings className="h-4 w-4" />
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
