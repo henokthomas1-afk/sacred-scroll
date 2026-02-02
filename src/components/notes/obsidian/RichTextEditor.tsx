@@ -5,6 +5,7 @@
  * - Bold, Underline, Highlight
  * - Text alignment (left, center, right)
  * - Font size (increase/decrease)
+ * - Auto-linking of citation patterns (CCC 17, ST I.2.3, etc.)
  * - No markdown - stores as HTML
  * - Autosave on blur
  */
@@ -21,14 +22,19 @@ import {
   AlignRight,
   Plus,
   Minus,
+  Link,
+  Loader2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { autoLinkCitations, extractCitationFromLink, isCitationLink } from '@/lib/citationAutoLinker';
+import { toast } from '@/hooks/use-toast';
 
 interface RichTextEditorProps {
   content: string;
   fontSize?: number;
   onChange: (content: string) => void;
   onFontSizeChange?: (fontSize: number) => void;
+  onCitationClick?: (citationId: string, nodeId?: string) => void;
   placeholder?: string;
   className?: string;
 }
@@ -42,12 +48,15 @@ export function RichTextEditor({
   fontSize = DEFAULT_FONT_SIZE,
   onChange,
   onFontSizeChange,
+  onCitationClick,
   placeholder = 'Write your thoughts here...',
   className,
 }: RichTextEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null);
   const [currentFontSize, setCurrentFontSize] = useState(fontSize);
+  const [isAutoLinking, setIsAutoLinking] = useState(false);
   const isInitialMount = useRef(true);
+  const autoLinkTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Sync content on mount or when content changes externally
   useEffect(() => {
@@ -117,11 +126,54 @@ export function RichTextEditor({
     }
   }, [onChange]);
 
-  const handleBlur = useCallback(() => {
+  const handleBlur = useCallback(async () => {
     if (editorRef.current) {
-      onChange(editorRef.current.innerHTML);
+      const currentHtml = editorRef.current.innerHTML;
+      onChange(currentHtml);
+      
+      // Auto-link citations on blur (with debounce to avoid too many calls)
+      if (autoLinkTimeoutRef.current) {
+        clearTimeout(autoLinkTimeoutRef.current);
+      }
+      
+      autoLinkTimeoutRef.current = setTimeout(async () => {
+        setIsAutoLinking(true);
+        try {
+          const result = await autoLinkCitations(currentHtml);
+          if (result.linkedCount > 0 && editorRef.current) {
+            editorRef.current.innerHTML = result.html;
+            onChange(result.html);
+            toast({
+              title: `${result.linkedCount} citation(s) linked`,
+              description: 'Click on linked citations to navigate to source.',
+            });
+          }
+        } catch (err) {
+          console.error('Auto-linking error:', err);
+        } finally {
+          setIsAutoLinking(false);
+        }
+      }, 500);
     }
   }, [onChange]);
+
+  // Handle clicks on citation links
+  const handleClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement;
+    if (target.tagName === 'A' && isCitationLink(target)) {
+      e.preventDefault();
+      const citationData = extractCitationFromLink(target);
+      if (citationData && onCitationClick) {
+        if (citationData.type === 'document' && citationData.documentId) {
+          onCitationClick(citationData.documentId, citationData.nodeId);
+        } else if (citationData.type === 'bible' && citationData.translation && citationData.book) {
+          // Reconstruct Bible citation ID
+          const bibleId = `bible:${citationData.translation}:${citationData.book}:${citationData.chapter}:${citationData.verse}`;
+          onCitationClick(bibleId);
+        }
+      }
+    }
+  }, [onCitationClick]);
 
   const handlePaste = useCallback((e: React.ClipboardEvent) => {
     e.preventDefault();
@@ -231,12 +283,14 @@ export function RichTextEditor({
           className={cn(
             'min-h-full p-4 outline-none',
             'prose prose-sm max-w-none',
-            '[&:empty]:before:content-[attr(data-placeholder)] [&:empty]:before:text-muted-foreground [&:empty]:before:pointer-events-none'
+            '[&:empty]:before:content-[attr(data-placeholder)] [&:empty]:before:text-muted-foreground [&:empty]:before:pointer-events-none',
+            '[&_.citation-link]:text-primary [&_.citation-link]:underline [&_.citation-link]:cursor-pointer'
           )}
           style={{ fontSize: `${currentFontSize}px` }}
           data-placeholder={placeholder}
           onInput={handleInput}
           onBlur={handleBlur}
+          onClick={handleClick}
           onPaste={handlePaste}
           suppressContentEditableWarning
         />

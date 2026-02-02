@@ -15,6 +15,7 @@ import {
   MoreHorizontal,
   GripVertical,
   FolderPlus,
+  Settings,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -41,6 +42,7 @@ interface DocumentTreeItemProps {
   onRename: (id: string, type: 'folder' | 'document') => void;
   onDelete: (id: string, type: 'folder') => void;
   onCreateFolder: (parentId: string | null) => void;
+  onOpenSettings?: (docId: string) => void;
 }
 
 export function DocumentTreeItem({
@@ -53,6 +55,7 @@ export function DocumentTreeItem({
   onRename,
   onDelete,
   onCreateFolder,
+  onOpenSettings,
 }: DocumentTreeItemProps) {
   const [isHovered, setIsHovered] = useState(false);
   
@@ -192,6 +195,7 @@ export function DocumentTreeItem({
               onRename={onRename}
               onDelete={onDelete}
               onCreateFolder={onCreateFolder}
+              onOpenSettings={onOpenSettings}
             />
           ))}
         </CollapsibleContent>
@@ -251,6 +255,15 @@ export function DocumentTreeItem({
           <DropdownMenuItem onClick={() => onRename(node.id, 'document')}>
             Rename
           </DropdownMenuItem>
+          {onOpenSettings && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => onOpenSettings(node.id)}>
+                <Settings className="h-4 w-4 mr-2" />
+                Citation Aliases
+              </DropdownMenuItem>
+            </>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
     </div>

@@ -6,3 +6,4 @@ export { CitationPanel } from "./CitationPanel";
 export { CitationAnchorMenu } from "./CitationAnchorMenu";
 export { SplitScreenReader } from "./SplitScreenReader";
 export { DocumentSelector } from "./DocumentSelector";
+export { DocumentSettingsModal } from "./DocumentSettingsModal";

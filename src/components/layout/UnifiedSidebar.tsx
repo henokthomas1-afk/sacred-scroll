@@ -16,6 +16,7 @@ import { LibraryItemMenu } from '@/components/layout/LibraryItemMenu';
 import { CreateDialog } from '@/components/notes/obsidian/CreateDialog';
 import { RenameDialog } from '@/components/notes/obsidian/RenameDialog';
 import { DeleteConfirmDialog } from '@/components/notes/obsidian/DeleteConfirmDialog';
+import { DocumentSettingsModal } from '@/components/reader/DocumentSettingsModal';
 import { ParsedDocument } from '@/types/document';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -136,7 +137,9 @@ export function UnifiedSidebar({
   const [deleteName, setDeleteName] = useState('');
   const [deleteHasChildren, setDeleteHasChildren] = useState(false);
 
-  // Find node helper for notes
+  // Document settings modal state
+  const [settingsDocId, setSettingsDocId] = useState<string | null>(null);
+  const settingsDoc = settingsDocId ? documents.find(d => d.metadata.id === settingsDocId) : null;
   const findNoteNode = useCallback((id: string, nodes: TreeNode[] = noteTree): TreeNode | null => {
     for (const node of nodes) {
       if (node.id === id) return node;
@@ -447,6 +450,12 @@ export function UnifiedSidebar({
     }
   };
 
+  // ============= Document Settings =============
+  
+  const handleOpenDocSettings = useCallback((docId: string) => {
+    setSettingsDocId(docId);
+  }, []);
+
   return (
     <div className={cn('flex flex-col h-full bg-sidebar', className)}>
       {/* Header with app controls */}
@@ -589,6 +598,7 @@ export function UnifiedSidebar({
                       onRename={handleRenameDoc}
                       onDelete={handleDeleteDoc}
                       onCreateFolder={handleCreateDocFolderInFolder}
+                      onOpenSettings={handleOpenDocSettings}
                       className="mt-0.5"
                     />
                   )}
@@ -721,6 +731,15 @@ export function UnifiedSidebar({
         hasChildren={deleteHasChildren}
         onConfirm={handleDeleteConfirm}
       />
+
+      {/* Document Settings Modal */}
+      {settingsDoc && (
+        <DocumentSettingsModal
+          open={!!settingsDocId}
+          onOpenChange={(open) => !open && setSettingsDocId(null)}
+          document={settingsDoc}
+        />
+      )}
     </div>
   );
 }

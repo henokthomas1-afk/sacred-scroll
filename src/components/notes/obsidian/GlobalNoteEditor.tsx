@@ -223,6 +223,7 @@ export function GlobalNoteEditor({
             setContent(html);
           }}
           onFontSizeChange={handleFontSizeChange}
+          onCitationClick={onCitationClick}
           placeholder="Write your thoughts here..."
         />
       </div>

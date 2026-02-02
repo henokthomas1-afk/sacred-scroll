@@ -25,6 +25,7 @@ interface DocumentTreeProps {
   onRename: (id: string, type: 'folder' | 'document') => void;
   onDelete: (id: string, type: 'folder') => void;
   onCreateFolder: (parentId: string | null) => void;
+  onOpenSettings?: (docId: string) => void;
   className?: string;
 }
 
@@ -37,6 +38,7 @@ export function DocumentTree({
   onRename,
   onDelete,
   onCreateFolder,
+  onOpenSettings,
   className,
 }: DocumentTreeProps) {
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
@@ -122,6 +124,7 @@ export function DocumentTree({
               onRename={onRename}
               onDelete={onDelete}
               onCreateFolder={onCreateFolder}
+              onOpenSettings={onOpenSettings}
             />
           ))}
         </div>

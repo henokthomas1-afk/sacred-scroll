@@ -12,6 +12,13 @@
  */
 
 import { exportLibrary, importLibrary, LibraryExport } from '@/lib/db';
+import { exportCitationAliases, importCitationAliases, CitationAliasExport } from '@/lib/db/citationAliasDb';
+import { exportGlobalNotes, importGlobalNotes, GlobalNotesExport } from '@/lib/db/notesDb';
+
+interface FullLibraryExport extends LibraryExport {
+  citationAliases?: CitationAliasExport;
+  globalNotes?: GlobalNotesExport;
+}
 
 export type SyncProvider = 'dropbox' | 'onedrive' | 'local';
 
@@ -53,8 +60,19 @@ export function setSyncConfig(config: SyncConfig): void {
 // ============= Export to File =============
 
 export async function exportToFile(): Promise<void> {
-  const data = await exportLibrary();
-  const json = JSON.stringify(data, null, 2);
+  const [libraryData, aliasData, notesData] = await Promise.all([
+    exportLibrary(),
+    exportCitationAliases(),
+    exportGlobalNotes(),
+  ]);
+  
+  const fullExport: FullLibraryExport = {
+    ...libraryData,
+    citationAliases: aliasData,
+    globalNotes: notesData,
+  };
+  
+  const json = JSON.stringify(fullExport, null, 2);
   const blob = new Blob([json], { type: 'application/json' });
   
   const url = URL.createObjectURL(blob);
@@ -72,7 +90,7 @@ export async function exportToFile(): Promise<void> {
 export async function importFromFile(file: File): Promise<SyncResult> {
   try {
     const text = await file.text();
-    const data: LibraryExport = JSON.parse(text);
+    const data: FullLibraryExport = JSON.parse(text);
     
     // Validate structure
     if (!data.version || !data.documents || !data.documentNodes) {
@@ -87,10 +105,22 @@ export async function importFromFile(file: File): Promise<SyncResult> {
     
     const result = await importLibrary(data);
     
+    // Import citation aliases if present
+    let aliasResult = { added: 0, updated: 0 };
+    if (data.citationAliases) {
+      aliasResult = await importCitationAliases(data.citationAliases);
+    }
+    
+    // Import global notes if present
+    let notesResult = { added: 0, updated: 0 };
+    if (data.globalNotes) {
+      notesResult = await importGlobalNotes(data.globalNotes);
+    }
+    
     return {
       success: true,
-      added: result.added,
-      updated: result.updated,
+      added: result.added + aliasResult.added + notesResult.added,
+      updated: result.updated + aliasResult.updated + notesResult.updated,
       conflicts: 0,
     };
   } catch (err: any) {
