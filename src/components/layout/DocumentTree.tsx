@@ -23,7 +23,7 @@ interface DocumentTreeProps {
     afterId: string | null
   ) => Promise<void>;
   onRename: (id: string, type: 'folder' | 'document') => void;
-  onDelete: (id: string, type: 'folder') => void;
+  onDelete: (id: string, type: 'folder' | 'document') => void;
   onCreateFolder: (parentId: string | null) => void;
   onOpenSettings?: (docId: string) => void;
   className?: string;

@@ -40,7 +40,7 @@ interface DocumentTreeItemProps {
   onToggleFolder: (folderId: string) => void;
   onSelectDocument: (docId: string) => void;
   onRename: (id: string, type: 'folder' | 'document') => void;
-  onDelete: (id: string, type: 'folder') => void;
+  onDelete: (id: string, type: 'folder' | 'document') => void;
   onCreateFolder: (parentId: string | null) => void;
   onOpenSettings?: (docId: string) => void;
 }
@@ -264,6 +264,13 @@ export function DocumentTreeItem({
               </DropdownMenuItem>
             </>
           )}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem 
+            className="text-destructive"
+            onClick={() => onDelete(node.id, 'document')}
+          >
+            Delete
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     </div>

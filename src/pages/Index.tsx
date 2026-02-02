@@ -24,6 +24,7 @@ import {
   Settings,
   SplitSquareHorizontal,
   X,
+  Home,
 } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -101,6 +102,16 @@ export default function Index() {
     setBibleNavigation(undefined);
   }, []);
 
+  // Return to Home handler
+  const handleReturnToHome = useCallback(() => {
+    setSelectedDocument(null);
+    setSecondaryDocument(null);
+    setShowBible(false);
+    setBibleNavigation(undefined);
+    setSplitViewEnabled(false);
+    setSelectedNoteId(null);
+  }, []);
+
   const handleBibleCiteVerse = useCallback((verseId: string, verseText: string) => {
     // This would integrate with the notes system to insert a citation
     toast({
@@ -160,6 +171,32 @@ export default function Index() {
   const handleImportSuccess = useCallback(() => {
     refreshDocuments();
   }, [refreshDocuments]);
+
+  // Delete document handler
+  const handleDeleteDocument = useCallback(async (docId: string): Promise<boolean> => {
+    // Import the db functions dynamically
+    const { deleteDocument: deleteDocFromDb } = await import('@/lib/db');
+    const { removeDocumentAssignment } = await import('@/lib/db/documentsDb');
+    try {
+      // Clear the folder assignment first
+      await removeDocumentAssignment(docId);
+      // Then delete the document itself
+      await deleteDocFromDb(docId);
+      // Clear selection if deleted document was selected
+      if (selectedDocument?.metadata.id === docId) {
+        setSelectedDocument(null);
+        setSplitViewEnabled(false);
+      }
+      if (secondaryDocument?.metadata.id === docId) {
+        setSecondaryDocument(null);
+      }
+      refreshDocuments();
+      return true;
+    } catch (err) {
+      console.error('Error deleting document:', err);
+      return false;
+    }
+  }, [selectedDocument, secondaryDocument, refreshDocuments]);
 
   const handleExportLibrary = useCallback(async () => {
     try {
@@ -332,6 +369,7 @@ export default function Index() {
             onExportLibrary={handleExportLibrary}
             onImportLibrary={handleImportLibrary}
             onOpenBible={handleOpenBible}
+            onDeleteDocument={handleDeleteDocument}
             isBibleActive={showBible}
             className="flex-1"
           />
@@ -342,9 +380,20 @@ export default function Index() {
           {/* Content header with split view toggle */}
           {(selectedDocument || showBible) && (
             <div className="shrink-0 flex items-center justify-between px-4 py-2 border-b border-border bg-card">
-              <h1 className="font-display font-semibold text-lg truncate">
-                {showBible ? 'Bible' : selectedDocument?.metadata.title}
-              </h1>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={handleReturnToHome}
+                  title="Return to Home"
+                >
+                  <Home className="h-4 w-4" />
+                </Button>
+                <h1 className="font-display font-semibold text-lg truncate">
+                  {showBible ? 'Bible' : selectedDocument?.metadata.title}
+                </h1>
+              </div>
               <div className="flex items-center gap-2">
                 {splitViewEnabled ? (
                   <Button
@@ -512,14 +561,32 @@ export default function Index() {
                 setSidebarOpen(false);
                 handleOpenBible();
               }}
+              onDeleteDocument={handleDeleteDocument}
               isBibleActive={showBible}
             />
           </SheetContent>
         </Sheet>
 
-        <h1 className="font-display font-semibold text-lg truncate flex-1 text-center">
-          {showBible ? 'Bible' : selectedDocument?.metadata.title || 'Sacred Text Reader'}
-        </h1>
+        {/* Mobile header content - changes based on view */}
+        {(selectedDocument || showBible) ? (
+          <>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleReturnToHome}
+              title="Return to Home"
+            >
+              <Home className="h-5 w-5" />
+            </Button>
+            <h1 className="font-display font-semibold text-lg truncate flex-1 text-center">
+              {showBible ? 'Bible' : selectedDocument?.metadata.title}
+            </h1>
+          </>
+        ) : (
+          <h1 className="font-display font-semibold text-lg truncate flex-1 text-center">
+            Sacred Library
+          </h1>
+        )}
 
         <Button
           variant="ghost"
