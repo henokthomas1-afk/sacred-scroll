@@ -131,6 +131,13 @@ export async function saveDocument(
   return docId;
 }
 
+export async function renameDocument(id: string, title: string): Promise<void> {
+  await db.documents.update(id, {
+    title,
+    updatedAt: now(),
+  });
+}
+
 export async function deleteDocument(id: string): Promise<void> {
   await db.transaction('rw', [db.documents, db.documentNodes, db.notes, db.noteCitations], async () => {
     // Get all notes for this document
