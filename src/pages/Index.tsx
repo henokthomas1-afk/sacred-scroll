@@ -21,7 +21,7 @@ import {
   PanelLeftOpen, 
   PanelLeftClose, 
   BookOpen, 
-  Plus,
+  Settings,
   SplitSquareHorizontal,
   X,
 } from 'lucide-react';
@@ -31,6 +31,7 @@ import { useLocalDocuments } from '@/hooks/useLocalDocuments';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { useGlobalNotes } from '@/hooks/useGlobalNotes';
 import { ImportDocumentModal } from '@/components/import/ImportDocumentModal';
+import { SettingsPanel } from '@/components/settings';
 import { exportToFile, importFromFile } from '@/lib/sync/syncManager';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
 import { toast } from '@/hooks/use-toast';
@@ -53,6 +54,7 @@ export default function Index() {
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [importModalOpen, setImportModalOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [documentSelectorOpen, setDocumentSelectorOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useLocalStorage(SIDEBAR_COLLAPSED_KEY, false);
   const [splitViewEnabled, setSplitViewEnabled] = useState(false);
@@ -289,10 +291,10 @@ export default function Index() {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => setImportModalOpen(true)}
-              title="Import document"
+              onClick={() => setSettingsOpen(true)}
+              title="Settings"
             >
-              <Plus className="h-5 w-5" />
+              <Settings className="h-5 w-5" />
             </Button>
           </div>
         )}
@@ -325,6 +327,7 @@ export default function Index() {
             onSelectDocument={handleSelectDocument}
             selectedNoteId={selectedNoteId}
             onSelectNote={handleSelectNote}
+            onOpenSettings={() => setSettingsOpen(true)}
             onImportDocument={() => setImportModalOpen(true)}
             onExportLibrary={handleExportLibrary}
             onImportLibrary={handleImportLibrary}
@@ -460,6 +463,11 @@ export default function Index() {
           onOpenChange={setImportModalOpen}
           onSuccess={handleImportSuccess}
         />
+        <SettingsPanel
+          open={settingsOpen}
+          onOpenChange={setSettingsOpen}
+          onOpenImport={() => setImportModalOpen(true)}
+        />
         <DocumentSelector
           open={documentSelectorOpen}
           onOpenChange={setDocumentSelectorOpen}
@@ -490,6 +498,10 @@ export default function Index() {
               onSelectDocument={handleSelectDocument}
               selectedNoteId={selectedNoteId}
               onSelectNote={handleSelectNote}
+              onOpenSettings={() => {
+                setSidebarOpen(false);
+                setSettingsOpen(true);
+              }}
               onImportDocument={() => {
                 setSidebarOpen(false);
                 setImportModalOpen(true);
@@ -512,9 +524,9 @@ export default function Index() {
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => setImportModalOpen(true)}
+          onClick={() => setSettingsOpen(true)}
         >
-          <Plus className="h-5 w-5" />
+          <Settings className="h-5 w-5" />
         </Button>
       </header>
 
@@ -551,6 +563,11 @@ export default function Index() {
         open={importModalOpen}
         onOpenChange={setImportModalOpen}
         onSuccess={handleImportSuccess}
+      />
+      <SettingsPanel
+        open={settingsOpen}
+        onOpenChange={setSettingsOpen}
+        onOpenImport={() => setImportModalOpen(true)}
       />
     </div>
   );
