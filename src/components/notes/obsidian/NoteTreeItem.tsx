@@ -2,7 +2,6 @@
  * NoteTreeItem - Draggable tree item for folders and notes
  */
 
-import { useState } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { TreeNode } from '@/hooks/useGlobalNotes';
@@ -12,7 +11,6 @@ import {
   FileText, 
   ChevronRight, 
   ChevronDown,
-  MoreHorizontal,
   GripVertical,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -57,8 +55,6 @@ export function NoteTreeItem({
   onCreateNote,
   onCreateFolder,
 }: NoteTreeItemProps) {
-  const [isHovered, setIsHovered] = useState(false);
-  
   const {
     attributes,
     listeners,
@@ -105,23 +101,50 @@ export function NoteTreeItem({
           style={style}
           data-tree-id={node.id}
           className={cn(
-            'group flex items-center gap-1 py-1 px-2 rounded-md cursor-pointer',
+            'group relative flex items-center gap-1 py-1 px-2 rounded-md cursor-pointer',
             'hover:bg-muted/50 transition-colors',
             isFocused && 'ring-1 ring-primary/50',
             isDragging && 'opacity-50 bg-muted'
           )}
-          onMouseEnter={() => setIsHovered(true)}
-          onMouseLeave={() => setIsHovered(false)}
           onContextMenu={handleContextMenu}
         >
-          {/* Drag handle */}
+          {/* Drag handle with dropdown menu */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <div
+                className="opacity-0 group-hover:opacity-100 cursor-pointer hover:text-foreground"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <GripVertical className="h-3 w-3 text-muted-foreground" />
+              </div>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuItem onClick={() => onCreateNote(node.id)}>
+                New Note
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onCreateFolder(node.id)}>
+                New Folder
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => onRename(node.id, 'folder')}>
+                Rename
+              </DropdownMenuItem>
+              <DropdownMenuItem 
+                className="text-destructive"
+                onClick={() => onDelete(node.id, 'folder')}
+              >
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          
+          {/* Hidden drag handle for DnD */}
           <div
             {...attributes}
             {...listeners}
-            className="opacity-0 group-hover:opacity-100 cursor-grab"
-          >
-            <GripVertical className="h-3 w-3 text-muted-foreground" />
-          </div>
+            className="absolute left-0 top-0 w-full h-full opacity-0 cursor-grab"
+            style={{ pointerEvents: 'none' }}
+          />
 
           {/* Indent spacer */}
           <div style={{ width: depth * 16 }} />
@@ -155,41 +178,6 @@ export function NoteTreeItem({
           >
             {node.name}
           </span>
-
-          {/* Actions dropdown */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className={cn(
-                  'h-6 w-6 shrink-0',
-                  isHovered ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-                )}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => onCreateNote(node.id)}>
-                New Note
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onCreateFolder(node.id)}>
-                New Folder
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => onRename(node.id, 'folder')}>
-                Rename
-              </DropdownMenuItem>
-              <DropdownMenuItem 
-                className="text-destructive"
-                onClick={() => onDelete(node.id, 'folder')}
-              >
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
         </div>
 
         <CollapsibleContent>
@@ -221,51 +209,26 @@ export function NoteTreeItem({
       style={style}
       data-tree-id={node.id}
       className={cn(
-        'group flex items-center gap-1 py-1 px-2 rounded-md cursor-pointer',
+        'group relative flex items-center gap-1 py-1 px-2 rounded-md cursor-pointer',
         'hover:bg-muted/50 transition-colors',
         isSelected && 'bg-primary/10 text-primary',
         isFocused && !isSelected && 'ring-1 ring-primary/50',
         isDragging && 'opacity-50 bg-muted'
       )}
       onClick={handleClick}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
       onContextMenu={handleContextMenu}
     >
-      {/* Drag handle */}
-      <div
-        {...attributes}
-        {...listeners}
-        className="opacity-0 group-hover:opacity-100 cursor-grab"
-      >
-        <GripVertical className="h-3 w-3 text-muted-foreground" />
-      </div>
-
-      {/* Indent spacer */}
-      <div style={{ width: depth * 16 + 20 }} />
-
-      {/* Icon */}
-      <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
-
-      {/* Name */}
-      <span className="flex-1 text-sm truncate">{node.name}</span>
-
-      {/* Actions dropdown */}
+      {/* Drag handle with dropdown menu */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            className={cn(
-              'h-6 w-6 shrink-0',
-              isHovered ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-            )}
+          <div
+            className="opacity-0 group-hover:opacity-100 cursor-pointer hover:text-foreground"
             onClick={(e) => e.stopPropagation()}
           >
-            <MoreHorizontal className="h-4 w-4" />
-          </Button>
+            <GripVertical className="h-3 w-3 text-muted-foreground" />
+          </div>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
+        <DropdownMenuContent align="start">
           <DropdownMenuItem onClick={() => onRename(node.id, 'note')}>
             Rename
           </DropdownMenuItem>
@@ -277,6 +240,23 @@ export function NoteTreeItem({
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+      
+      {/* Hidden drag handle for DnD */}
+      <div
+        {...attributes}
+        {...listeners}
+        className="absolute left-0 top-0 w-full h-full opacity-0 cursor-grab"
+        style={{ pointerEvents: 'none' }}
+      />
+
+      {/* Indent spacer */}
+      <div style={{ width: depth * 16 + 20 }} />
+
+      {/* Icon */}
+      <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
+
+      {/* Name */}
+      <span className="flex-1 text-sm truncate">{node.name}</span>
     </div>
   );
 }
