@@ -41,6 +41,7 @@ interface NoteTreeProps {
   onDelete: (id: string, type: 'folder' | 'note') => void;
   onCreateNote: (parentId: string | null) => void;
   onCreateFolder: (parentId: string | null) => void;
+  onOpenInSplit?: (noteId: string) => void;
   className?: string;
 }
 
@@ -53,6 +54,7 @@ export function NoteTree({
   onDelete,
   onCreateNote,
   onCreateFolder,
+  onOpenInSplit,
   className,
 }: NoteTreeProps) {
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
@@ -301,6 +303,7 @@ export function NoteTree({
                 onDelete={onDelete}
                 onCreateNote={onCreateNote}
                 onCreateFolder={onCreateFolder}
+                onOpenInSplit={onOpenInSplit}
               />
             ))}
           </div>

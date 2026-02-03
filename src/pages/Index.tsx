@@ -2,14 +2,13 @@
  * Sacred Text Reader - Main Page
  * 
  * Obsidian-style layout with unified sidebar (Library + Notes) on the left
- * and main content area on the right that supports split view.
- * Shows Home screen when no content is active.
- * Includes first-class Bible reader integration.
+ * and main content area on the right that supports flexible split view.
+ * Notes can be primary workspace content with any secondary content.
  */
 
 import { useState, useMemo, useCallback } from 'react';
 import { ParsedDocument } from '@/types/document';
-import { BibleNavigationState, parseBibleCitationId, isBibleCitationId } from '@/types/bible';
+import { BibleNavigationState } from '@/types/bible';
 import { DocumentSelector, SplitScreenReader } from '@/components/reader';
 import { BibleReader } from '@/components/bible';
 import { GlobalNoteEditor } from '@/components/notes/obsidian/GlobalNoteEditor';
@@ -20,7 +19,6 @@ import { Button } from '@/components/ui/button';
 import { 
   PanelLeftOpen, 
   PanelLeftClose, 
-  BookOpen, 
   Settings,
   SplitSquareHorizontal,
   X,
@@ -31,6 +29,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { useLocalDocuments } from '@/hooks/useLocalDocuments';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { useGlobalNotes } from '@/hooks/useGlobalNotes';
+import { useWorkspace } from '@/hooks/useWorkspace';
 import { ImportDocumentModal } from '@/components/import/ImportDocumentModal';
 import { SettingsPanel } from '@/components/settings';
 import { exportToFile, importFromFile } from '@/lib/sync/syncManager';
@@ -50,89 +49,80 @@ export default function Index() {
     removeCitation,
   } = useGlobalNotes();
   
-  const [selectedDocument, setSelectedDocument] = useState<ParsedDocument | null>(null);
-  const [secondaryDocument, setSecondaryDocument] = useState<ParsedDocument | null>(null);
-  const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [importModalOpen, setImportModalOpen] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const [documentSelectorOpen, setDocumentSelectorOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useLocalStorage(SIDEBAR_COLLAPSED_KEY, false);
-  const [splitViewEnabled, setSplitViewEnabled] = useState(false);
-  
-  // Bible state
-  const [showBible, setShowBible] = useState(false);
-  const [bibleNavigation, setBibleNavigation] = useState<BibleNavigationState | undefined>();
-  
-  const isMobile = useIsMobile();
-
   // Combine user documents with sample documents
   const allDocuments = useMemo(() => {
     return [...userDocuments, ...sampleDocuments];
   }, [userDocuments]);
 
-  // Do NOT auto-select a document - start with Home screen
-  // (Removed the previous useMemo that auto-selected first document)
+  // Workspace state management (flexible primary/secondary panels)
+  const workspace = useWorkspace({ documents: allDocuments });
+  
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [importModalOpen, setImportModalOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [documentSelectorOpen, setDocumentSelectorOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useLocalStorage(SIDEBAR_COLLAPSED_KEY, false);
+  
+  const isMobile = useIsMobile();
+
+  // ============= Sidebar Actions =============
 
   const handleSelectDocument = useCallback((doc: ParsedDocument) => {
-    setSelectedDocument(doc);
-    setSecondaryDocument(null);
-    setShowBible(false); // Close Bible when selecting a document
+    workspace.openDocumentPrimary(doc.metadata.id);
     setSidebarOpen(false);
-  }, []);
+  }, [workspace]);
 
   const handleSelectNote = useCallback((noteId: string) => {
-    setSelectedNoteId(noteId || null);
-    // Auto-enable split view when selecting a note
-    if (noteId && (selectedDocument || showBible)) {
-      setSplitViewEnabled(true);
+    if (!noteId) return;
+    
+    // If there's already primary content, open note in secondary
+    if (workspace.state.primaryView !== 'home') {
+      workspace.openNoteSecondary(noteId);
+    } else {
+      // Open as primary
+      workspace.openNotePrimary(noteId);
     }
-  }, [selectedDocument, showBible]);
+  }, [workspace]);
+
+  const handleOpenDocumentInSplit = useCallback((docId: string) => {
+    workspace.openDocumentSecondary(docId);
+  }, [workspace]);
+
+  const handleOpenNoteInSplit = useCallback((noteId: string) => {
+    workspace.openNoteSecondary(noteId);
+  }, [workspace]);
+
+  const handleOpenBibleInSplit = useCallback(() => {
+    workspace.openBibleSecondary();
+  }, [workspace]);
 
   // Bible handlers
   const handleOpenBible = useCallback(() => {
-    setShowBible(true);
-    setSelectedDocument(null);
-    setSecondaryDocument(null);
-    setBibleNavigation(undefined);
-  }, []);
+    workspace.openBiblePrimary();
+  }, [workspace]);
 
-  const handleCloseBible = useCallback(() => {
-    setShowBible(false);
-    setBibleNavigation(undefined);
-  }, []);
-
-  // Return to Home handler
   const handleReturnToHome = useCallback(() => {
-    setSelectedDocument(null);
-    setSecondaryDocument(null);
-    setShowBible(false);
-    setBibleNavigation(undefined);
-    setSplitViewEnabled(false);
-    setSelectedNoteId(null);
-  }, []);
+    workspace.returnToHome();
+  }, [workspace]);
 
   const handleBibleCiteVerse = useCallback((verseId: string, verseText: string) => {
-    // This would integrate with the notes system to insert a citation
     toast({
       title: 'Verse cited',
       description: `${verseText} - Citation saved to clipboard`,
     });
-    // Copy to clipboard for easy pasting
     navigator.clipboard.writeText(`[[${verseId}|${verseText}]]`);
   }, []);
 
-  // Home screen action handlers
+  // ============= Home Screen Actions =============
+
   const handleHomeOpenLibrary = useCallback(() => {
-    // Focus the library section - just expand sidebar if collapsed
     setSidebarCollapsed(false);
   }, [setSidebarCollapsed]);
 
   const handleHomeCreateNote = useCallback(async () => {
     try {
       const id = await createNote('Untitled', '', null);
-      setSelectedNoteId(id);
-      setSplitViewEnabled(true);
+      workspace.openNotePrimary(id);
       toast({ title: 'Note created' });
     } catch (err: any) {
       toast({
@@ -141,64 +131,59 @@ export default function Index() {
         variant: 'destructive',
       });
     }
-  }, [createNote]);
+  }, [createNote, workspace]);
 
   const handleHomeSelectDocument = useCallback((docId: string) => {
-    const doc = allDocuments.find(d => d.metadata.id === docId);
-    if (doc) {
-      setSelectedDocument(doc);
-    }
-  }, [allDocuments]);
+    workspace.openDocumentPrimary(docId);
+  }, [workspace]);
 
   const handleHomeSelectNote = useCallback((noteId: string) => {
-    setSelectedNoteId(noteId);
-    setSplitViewEnabled(true);
-  }, []);
+    workspace.openNotePrimary(noteId);
+  }, [workspace]);
+
+  // ============= Split View Actions =============
 
   const handleOpenDocumentSplitView = useCallback(() => {
     setDocumentSelectorOpen(true);
   }, []);
 
   const handleSelectSecondaryDocument = useCallback((doc: ParsedDocument) => {
-    setSecondaryDocument(doc);
-  }, []);
+    workspace.openDocumentSecondary(doc.metadata.id);
+    setDocumentSelectorOpen(false);
+  }, [workspace]);
 
   const handleCloseSplitView = useCallback(() => {
-    setSplitViewEnabled(false);
-    setSecondaryDocument(null);
-  }, []);
+    workspace.closeSecondary();
+  }, [workspace]);
+
+  // ============= Document Management =============
 
   const handleImportSuccess = useCallback(() => {
     refreshDocuments();
   }, [refreshDocuments]);
 
-  // Delete document handler
   const handleDeleteDocument = useCallback(async (docId: string): Promise<boolean> => {
-    // Import the db functions dynamically
     const { deleteDocument: deleteDocFromDb } = await import('@/lib/db');
     const { removeDocumentAssignment } = await import('@/lib/db/documentsDb');
     try {
-      // Clear the folder assignment first
       await removeDocumentAssignment(docId);
-      // Then delete the document itself
       await deleteDocFromDb(docId);
-      // Clear selection if deleted document was selected
-      if (selectedDocument?.metadata.id === docId) {
-        setSelectedDocument(null);
-        setSplitViewEnabled(false);
+      
+      // Clear workspace if needed
+      if (workspace.state.primaryDocumentId === docId) {
+        workspace.returnToHome();
+      } else if (workspace.state.secondaryDocumentId === docId) {
+        workspace.closeSecondary();
       }
-      if (secondaryDocument?.metadata.id === docId) {
-        setSecondaryDocument(null);
-      }
+      
       refreshDocuments();
       return true;
     } catch (err) {
       console.error('Error deleting document:', err);
       return false;
     }
-  }, [selectedDocument, secondaryDocument, refreshDocuments]);
+  }, [workspace, refreshDocuments]);
 
-  // Rename document handler
   const handleRenameDocument = useCallback(async (docId: string, newName: string): Promise<void> => {
     const { renameDocument } = await import('@/lib/db');
     await renameDocument(docId, newName);
@@ -247,67 +232,23 @@ export default function Index() {
     input.click();
   }, [refreshDocuments]);
 
-  // Handle citation navigation - find document and scroll to node
-  // Also handles Bible citations (bible:translation:book:chapter:verse)
+  // ============= Citation Navigation =============
+
   const handleCitationClick = useCallback((citationId: string, nodeId?: string) => {
-    // Check if this is a Bible citation
-    if (isBibleCitationId(citationId)) {
-      const bibleCitation = parseBibleCitationId(citationId);
-      if (bibleCitation) {
-        setBibleNavigation({
-          translation: bibleCitation.translation,
-          book: bibleCitation.book,
-          chapter: bibleCitation.chapter,
-          verse: bibleCitation.verse,
-        });
-        setShowBible(true);
-        setSelectedDocument(null);
-        return;
-      }
-    }
+    workspace.handleCitationNavigation(citationId, nodeId);
+  }, [workspace]);
 
-    // Regular document citation
-    const targetDoc = allDocuments.find((d) => d.metadata.id === citationId);
-    
-    if (!targetDoc) {
-      toast({
-        title: 'Document not found',
-        description: 'The referenced document is not in your library.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    // Close Bible if navigating to a document
-    setShowBible(false);
-
-    // If different document, open in secondary or switch primary
-    if (selectedDocument?.metadata.id !== citationId) {
-      if (splitViewEnabled) {
-        setSecondaryDocument(targetDoc);
-      } else {
-        setSelectedDocument(targetDoc);
-      }
-    }
-
-    // Scroll to node after a short delay
-    if (nodeId) {
-      setTimeout(() => {
-        const element = document.querySelector(`[data-paragraph-id="${nodeId}"]`);
-        element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        // Add highlight effect
-        element?.classList.add('citation-highlight');
-        setTimeout(() => element?.classList.remove('citation-highlight'), 2000);
-      }, 100);
-    }
-  }, [allDocuments, selectedDocument, splitViewEnabled]);
-
-  // Handle navigation to a note (e.g., after creating citation)
   const handleNavigateToNote = useCallback((noteId: string) => {
-    setSelectedNoteId(noteId);
-    setSplitViewEnabled(true);
-    toast({ title: 'Note created' });
-  }, []);
+    // Open note in secondary panel when navigating from a citation
+    if (workspace.state.primaryView !== 'home') {
+      workspace.openNoteSecondary(noteId);
+    } else {
+      workspace.openNotePrimary(noteId);
+    }
+    toast({ title: 'Note opened' });
+  }, [workspace]);
+
+  // ============= Note Operations =============
 
   const handleUpdateNote = useCallback(async (id: string, updates: Partial<{ title: string; content: string }>) => {
     await updateNote(id, updates);
@@ -317,7 +258,117 @@ export default function Index() {
     await updateNoteFontSize(id, fontSize);
   }, [updateNoteFontSize]);
 
-  // Desktop layout with permanent sidebar
+  const handleRemoveCitation = useCallback(async (citationId: string) => {
+    await removeCitation(citationId);
+  }, [removeCitation]);
+
+  // ============= Render Helpers =============
+
+  const getPrimaryTitle = () => {
+    switch (workspace.state.primaryView) {
+      case 'document':
+        return workspace.primaryDocument?.metadata.title || 'Document';
+      case 'bible':
+        return 'Bible';
+      case 'note':
+        const note = notes.find(n => n.id === workspace.state.primaryNoteId);
+        return note?.title || 'Note';
+      default:
+        return '';
+    }
+  };
+
+  const renderPrimaryContent = () => {
+    switch (workspace.state.primaryView) {
+      case 'home':
+        return (
+          <HomeScreen
+            onOpenLibrary={handleHomeOpenLibrary}
+            onImportDocument={() => setImportModalOpen(true)}
+            onCreateNote={handleHomeCreateNote}
+            recentDocuments={allDocuments.slice(0, 5).map(d => ({ id: d.metadata.id, title: d.metadata.title }))}
+            recentNotes={notes.slice(0, 5).map(n => ({ id: n.id, title: n.title }))}
+            onSelectDocument={handleHomeSelectDocument}
+            onSelectNote={handleHomeSelectNote}
+          />
+        );
+      
+      case 'document':
+        if (!workspace.primaryDocument) return null;
+        return (
+          <SplitScreenReader
+            primaryDocument={workspace.primaryDocument}
+            secondaryDocument={null}
+            onNavigateToNode={handleCitationClick}
+            onNavigateToNote={handleNavigateToNote}
+          />
+        );
+      
+      case 'bible':
+        return (
+          <BibleReader
+            initialNavigation={workspace.state.bibleNavigation}
+            onCiteVerse={handleBibleCiteVerse}
+          />
+        );
+      
+      case 'note':
+        if (!workspace.state.primaryNoteId) return null;
+        return (
+          <GlobalNoteEditor
+            noteId={workspace.state.primaryNoteId}
+            onUpdate={handleUpdateNote}
+            onFontSizeUpdate={handleUpdateNoteFontSize}
+            onCitationClick={handleCitationClick}
+            onRemoveCitation={handleRemoveCitation}
+          />
+        );
+      
+      default:
+        return null;
+    }
+  };
+
+  const renderSecondaryContent = () => {
+    switch (workspace.state.secondaryView) {
+      case 'document':
+        if (!workspace.secondaryDocument) return null;
+        return (
+          <SplitScreenReader
+            primaryDocument={workspace.secondaryDocument}
+            secondaryDocument={null}
+            onNavigateToNode={handleCitationClick}
+            onNavigateToNote={handleNavigateToNote}
+          />
+        );
+      
+      case 'bible':
+        return (
+          <BibleReader
+            initialNavigation={workspace.state.bibleNavigation}
+            onCiteVerse={handleBibleCiteVerse}
+          />
+        );
+      
+      case 'note':
+        if (!workspace.state.secondaryNoteId) return null;
+        return (
+          <GlobalNoteEditor
+            noteId={workspace.state.secondaryNoteId}
+            onUpdate={handleUpdateNote}
+            onFontSizeUpdate={handleUpdateNoteFontSize}
+            onCitationClick={handleCitationClick}
+            onRemoveCitation={handleRemoveCitation}
+          />
+        );
+      
+      default:
+        return null;
+    }
+  };
+
+  // ============= Desktop Layout =============
+
   if (!isMobile) {
     return (
       <div className="flex h-screen bg-background overflow-hidden">
@@ -367,9 +418,9 @@ export default function Index() {
           
           <UnifiedSidebar
             documents={allDocuments}
-            selectedDocumentId={selectedDocument?.metadata.id || null}
+            selectedDocumentId={workspace.state.primaryDocumentId}
             onSelectDocument={handleSelectDocument}
-            selectedNoteId={selectedNoteId}
+            selectedNoteId={workspace.state.primaryNoteId || workspace.state.secondaryNoteId}
             onSelectNote={handleSelectNote}
             onOpenSettings={() => setSettingsOpen(true)}
             onImportDocument={() => setImportModalOpen(true)}
@@ -378,7 +429,10 @@ export default function Index() {
             onOpenBible={handleOpenBible}
             onDeleteDocument={handleDeleteDocument}
             onRenameDocument={handleRenameDocument}
-            isBibleActive={showBible}
+            onOpenDocumentInSplit={handleOpenDocumentInSplit}
+            onOpenNoteInSplit={handleOpenNoteInSplit}
+            onOpenBibleInSplit={handleOpenBibleInSplit}
+            isBibleActive={workspace.state.primaryView === 'bible' || workspace.state.secondaryView === 'bible'}
             className="flex-1"
           />
         </aside>
@@ -386,7 +440,7 @@ export default function Index() {
         {/* Main Content Area */}
         <div className="flex-1 flex flex-col min-w-0 min-h-0">
           {/* Content header with split view toggle */}
-          {(selectedDocument || showBible) && (
+          {workspace.state.primaryView !== 'home' && (
             <div className="shrink-0 flex items-center justify-between px-4 py-2 border-b border-border bg-card">
               <div className="flex items-center gap-2">
                 <Button
@@ -399,11 +453,11 @@ export default function Index() {
                   <Home className="h-4 w-4" />
                 </Button>
                 <h1 className="font-display font-semibold text-lg truncate">
-                  {showBible ? 'Bible' : selectedDocument?.metadata.title}
+                  {getPrimaryTitle()}
                 </h1>
               </div>
               <div className="flex items-center gap-2">
-                {splitViewEnabled ? (
+                {workspace.isSplitViewActive ? (
                   <Button
                     variant="ghost"
                     size="sm"
@@ -417,10 +471,9 @@ export default function Index() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => setSplitViewEnabled(true)}
+                    onClick={handleOpenDocumentSplitView}
                     className="gap-2"
-                    disabled={!selectedNoteId}
-                    title={selectedNoteId ? "Open split view with note editor" : "Select a note first"}
+                    title="Open split view"
                   >
                     <SplitSquareHorizontal className="h-4 w-4" />
                     <span className="hidden sm:inline">Split View</span>
@@ -432,84 +485,24 @@ export default function Index() {
 
           {/* Main content */}
           <div className="flex-1 min-h-0">
-            {/* Home screen - no content active */}
-            {!selectedDocument && !showBible ? (
-              <HomeScreen
-                onOpenLibrary={handleHomeOpenLibrary}
-                onImportDocument={() => setImportModalOpen(true)}
-                onCreateNote={handleHomeCreateNote}
-                recentDocuments={allDocuments.slice(0, 5).map(d => ({ id: d.metadata.id, title: d.metadata.title }))}
-                recentNotes={notes.slice(0, 5).map(n => ({ id: n.id, title: n.title }))}
-                onSelectDocument={handleHomeSelectDocument}
-                onSelectNote={handleHomeSelectNote}
-              />
-            ) : showBible ? (
-              /* Bible reader view */
-              splitViewEnabled && selectedNoteId ? (
-                <ResizablePanelGroup direction="horizontal" className="h-full">
-                  <ResizablePanel defaultSize={60} minSize={30}>
-                    <BibleReader
-                      initialNavigation={bibleNavigation}
-                      onCiteVerse={handleBibleCiteVerse}
-                      onClose={handleCloseBible}
-                    />
-                  </ResizablePanel>
-                  <ResizableHandle withHandle />
-                  <ResizablePanel defaultSize={40} minSize={25}>
-                    <div className="h-full flex flex-col border-l border-border">
-                      <GlobalNoteEditor
-                        noteId={selectedNoteId}
-                        onUpdate={handleUpdateNote}
-                        onFontSizeUpdate={handleUpdateNoteFontSize}
-                        onCitationClick={handleCitationClick}
-                        onRemoveCitation={removeCitation}
-                      />
-                    </div>
-                  </ResizablePanel>
-                </ResizablePanelGroup>
-              ) : (
-                <BibleReader
-                  initialNavigation={bibleNavigation}
-                  onCiteVerse={handleBibleCiteVerse}
-                  onClose={handleCloseBible}
-                />
-              )
-            ) : splitViewEnabled && selectedNoteId ? (
-              /* Document reader with split note editor */
+            {workspace.state.primaryView === 'home' ? (
+              renderPrimaryContent()
+            ) : workspace.isSplitViewActive ? (
               <ResizablePanelGroup direction="horizontal" className="h-full">
-                <ResizablePanel defaultSize={60} minSize={30}>
-                  <SplitScreenReader
-                    primaryDocument={selectedDocument!}
-                    secondaryDocument={secondaryDocument}
-                    onOpenSecondary={handleOpenDocumentSplitView}
-                    onCloseSecondary={() => setSecondaryDocument(null)}
-                    onNavigateToNode={handleCitationClick}
-                    onNavigateToNote={handleNavigateToNote}
-                  />
+                <ResizablePanel defaultSize={50} minSize={25}>
+                  <div className="h-full">
+                    {renderPrimaryContent()}
+                  </div>
                 </ResizablePanel>
                 <ResizableHandle withHandle />
-                <ResizablePanel defaultSize={40} minSize={25}>
-                  <div className="h-full flex flex-col border-l border-border">
-                    <GlobalNoteEditor
-                      noteId={selectedNoteId}
-                      onUpdate={handleUpdateNote}
-                      onFontSizeUpdate={handleUpdateNoteFontSize}
-                      onCitationClick={handleCitationClick}
-                      onRemoveCitation={removeCitation}
-                    />
+                <ResizablePanel defaultSize={50} minSize={25}>
+                  <div className="h-full border-l border-border">
+                    {renderSecondaryContent()}
                   </div>
                 </ResizablePanel>
               </ResizablePanelGroup>
             ) : (
-              /* Document reader only */
-              <SplitScreenReader
-                primaryDocument={selectedDocument!}
-                secondaryDocument={secondaryDocument}
-                onOpenSecondary={handleOpenDocumentSplitView}
-                onCloseSecondary={() => setSecondaryDocument(null)}
-                onNavigateToNode={handleCitationClick}
-                onNavigateToNote={handleNavigateToNote}
-              />
+              renderPrimaryContent()
             )}
           </div>
         </div>
@@ -529,15 +522,16 @@ export default function Index() {
           open={documentSelectorOpen}
           onOpenChange={setDocumentSelectorOpen}
           documents={allDocuments}
-          currentDocumentId={selectedDocument?.metadata.id}
+          currentDocumentId={workspace.state.primaryDocumentId}
           onSelect={handleSelectSecondaryDocument}
-          title="Select document for split view"
+          title="Select content for split view"
         />
       </div>
     );
   }
 
-  // Mobile layout with sheet sidebar
+  // ============= Mobile Layout =============
+
   return (
     <div className="flex flex-col h-screen bg-background overflow-hidden">
       {/* Mobile Header */}
@@ -551,10 +545,16 @@ export default function Index() {
           <SheetContent side="left" className="p-0 w-72">
             <UnifiedSidebar
               documents={allDocuments}
-              selectedDocumentId={selectedDocument?.metadata.id || null}
-              onSelectDocument={handleSelectDocument}
-              selectedNoteId={selectedNoteId}
-              onSelectNote={handleSelectNote}
+              selectedDocumentId={workspace.state.primaryDocumentId}
+              onSelectDocument={(doc) => {
+                handleSelectDocument(doc);
+                setSidebarOpen(false);
+              }}
+              selectedNoteId={workspace.state.primaryNoteId}
+              onSelectNote={(noteId) => {
+                handleSelectNote(noteId);
+                setSidebarOpen(false);
+              }}
               onOpenSettings={() => {
                 setSidebarOpen(false);
                 setSettingsOpen(true);
@@ -571,13 +571,12 @@ export default function Index() {
               }}
               onDeleteDocument={handleDeleteDocument}
               onRenameDocument={handleRenameDocument}
-              isBibleActive={showBible}
+              isBibleActive={workspace.state.primaryView === 'bible'}
             />
           </SheetContent>
         </Sheet>
 
-        {/* Mobile header content - changes based on view */}
-        {(selectedDocument || showBible) ? (
+        {workspace.state.primaryView !== 'home' ? (
           <>
             <Button
               variant="ghost"
@@ -588,7 +587,7 @@ export default function Index() {
               <Home className="h-5 w-5" />
             </Button>
             <h1 className="font-display font-semibold text-lg truncate flex-1 text-center">
-              {showBible ? 'Bible' : selectedDocument?.metadata.title}
+              {getPrimaryTitle()}
             </h1>
           </>
         ) : (
@@ -608,30 +607,7 @@ export default function Index() {
 
       {/* Main Content */}
       <main className="flex-1 min-h-0">
-        {showBible ? (
-          <BibleReader
-            initialNavigation={bibleNavigation}
-            onCiteVerse={handleBibleCiteVerse}
-            onClose={handleCloseBible}
-          />
-        ) : selectedDocument ? (
-          <SplitScreenReader
-            primaryDocument={selectedDocument}
-            secondaryDocument={null}
-            onNavigateToNode={handleCitationClick}
-            onNavigateToNote={handleNavigateToNote}
-          />
-        ) : (
-          <HomeScreen
-            onOpenLibrary={() => setSidebarOpen(true)}
-            onImportDocument={() => setImportModalOpen(true)}
-            onCreateNote={handleHomeCreateNote}
-            recentDocuments={allDocuments.slice(0, 3).map(d => ({ id: d.metadata.id, title: d.metadata.title }))}
-            recentNotes={notes.slice(0, 3).map(n => ({ id: n.id, title: n.title }))}
-            onSelectDocument={handleHomeSelectDocument}
-            onSelectNote={handleHomeSelectNote}
-          />
-        )}
+        {renderPrimaryContent()}
       </main>
 
       {/* Modals */}
@@ -648,5 +624,3 @@ export default function Index() {
     </div>
   );
 }
-
-// EmptyState removed - replaced by HomeScreen
