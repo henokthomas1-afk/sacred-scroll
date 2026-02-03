@@ -65,6 +65,10 @@ interface UnifiedSidebarProps {
   onOpenBible?: () => void;
   onDeleteDocument?: (docId: string) => Promise<boolean>;
   onRenameDocument?: (docId: string, newName: string) => Promise<void>;
+  // Split view actions
+  onOpenDocumentInSplit?: (docId: string) => void;
+  onOpenNoteInSplit?: (noteId: string) => void;
+  onOpenBibleInSplit?: () => void;
   isBibleActive?: boolean;
   className?: string;
 }
@@ -82,6 +86,9 @@ export function UnifiedSidebar({
   onOpenBible,
   onDeleteDocument,
   onRenameDocument,
+  onOpenDocumentInSplit,
+  onOpenNoteInSplit,
+  onOpenBibleInSplit,
   isBibleActive = false,
   className,
 }: UnifiedSidebarProps) {
@@ -626,6 +633,7 @@ export function UnifiedSidebar({
                       onDelete={handleDeleteDoc}
                       onCreateFolder={handleCreateDocFolderInFolder}
                       onOpenSettings={handleOpenDocSettings}
+                      onOpenInSplit={onOpenDocumentInSplit}
                       className="mt-0.5"
                     />
                   )}
@@ -723,6 +731,7 @@ export function UnifiedSidebar({
                       onDelete={handleDeleteNote}
                       onCreateNote={handleCreateNoteInFolder}
                       onCreateFolder={handleCreateNoteFolderInFolder}
+                      onOpenInSplit={onOpenNoteInSplit}
                       className="mt-0.5"
                     />
                   )}

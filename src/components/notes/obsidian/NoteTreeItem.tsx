@@ -12,6 +12,7 @@ import {
   ChevronRight, 
   ChevronDown,
   GripVertical,
+  Columns2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -40,6 +41,7 @@ interface NoteTreeItemProps {
   onDelete: (id: string, type: 'folder' | 'note') => void;
   onCreateNote: (parentId: string | null) => void;
   onCreateFolder: (parentId: string | null) => void;
+  onOpenInSplit?: (noteId: string) => void;
 }
 
 export function NoteTreeItem({
@@ -54,6 +56,7 @@ export function NoteTreeItem({
   onDelete,
   onCreateNote,
   onCreateFolder,
+  onOpenInSplit,
 }: NoteTreeItemProps) {
   const {
     attributes,
@@ -195,6 +198,7 @@ export function NoteTreeItem({
               onDelete={onDelete}
               onCreateNote={onCreateNote}
               onCreateFolder={onCreateFolder}
+              onOpenInSplit={onOpenInSplit}
             />
           ))}
         </CollapsibleContent>
@@ -229,6 +233,15 @@ export function NoteTreeItem({
           </div>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start">
+          {onOpenInSplit && (
+            <>
+              <DropdownMenuItem onClick={() => onOpenInSplit(node.id)}>
+                <Columns2 className="h-4 w-4 mr-2" />
+                Open in Split
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+            </>
+          )}
           <DropdownMenuItem onClick={() => onRename(node.id, 'note')}>
             Rename
           </DropdownMenuItem>
